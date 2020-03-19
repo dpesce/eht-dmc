@@ -1,2 +1,2 @@
 # DMC
-radio interferometric imaging using a Hamiltonian Monte Carlo framework
+A radio interferometric imaging tool that utilizing the Hamiltonian Monte Carlo framework provided by PyMC3.
