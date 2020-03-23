@@ -135,13 +135,24 @@ def gain_phase_prior(obs,ref_station='AA'):
 
     return gainphase_mu, gainphase_kappa
 
-########################################################################
-# define a tuning procedure that adapts off-diagonal mass matrix terms
-# adapted from a blog post by Dan Foreman-Mackey here:
-# https://dfm.io/posts/pymc3-mass-matrix/
-
 def get_step_for_trace(trace=None, model=None, regularize=True, regular_window=5, regular_variance=1e-3, **kwargs):
-    
+    """ Define a tuning procedure that adapts off-diagonal mass matrix terms
+        adapted from a blog post by Dan Foreman-Mackey here:
+        https://dfm.io/posts/pymc3-mass-matrix/
+
+       Args:
+           trace (trace): pymc3 trace object
+           model (model): pymc3 model object
+           
+           regularize (bool): flag to turn on covariance matrix regularization
+           regular_window (int): size of parameter space at which regularization becomes important
+           regular_variance (float): magnitude of covariance floor
+           
+       Returns:
+           pymc3 step_methods object
+
+    """
+
     model = pm.modelcontext(model)
     
     # If not given, use the trivial metric
@@ -150,6 +161,7 @@ def get_step_for_trace(trace=None, model=None, regularize=True, regular_window=5
         return pm.NUTS(potential=potential, **kwargs)
     
     # Loop over samples and convert to the relevant parameter space
+    # while removing divergent samples
     div_mask = np.invert(np.copy(trace.diverging))
     samples = np.empty((div_mask.sum() * trace.nchains, model.ndim))
     i = 0
