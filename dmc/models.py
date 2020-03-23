@@ -16,11 +16,19 @@ import dmc.data_utils as du
 import dmc.model_utils as mu
 
 #######################################################
+# constants
+#######################################################
+
+MAX_TREEDEPTH = 10
+EARLY_MAX_TREEDEPTH = 10
+
+#######################################################
 # functions
 #######################################################
 
 def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
-          fit_StokesV=True,fit_total_flux=False,**kwargs):
+          fit_StokesV=True,fit_total_flux=False,n_start=25,n_burn=500,n_tune=5000,
+          **kwargs):
     """ Fit a polarimetric image (i.e., Stokes I, Q, U, and V) to a VLBI observation
 
        Args:
@@ -37,9 +45,13 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
            RLequal (bool): flag to fix right and left gain terms to be equal
            fit_StokesV (bool): flag to fit for Stokes V; set to False to fix V = 0
            fit_total_flux (bool): flag to fit for the total flux
+            
+           n_start (int): initial number of default tuning steps
+           n_burn (int): number of burn-in steps
+           n_tune (int): number of mass matrix tuning steps
            
        Returns:
-           tracefile (trace): a pymc3 trace object containin the model fit
+           trace (trace): a pymc3 trace object containin the model fit
 
     """
 
@@ -48,29 +60,46 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
     ref_station = kwargs.get('ref_station','AA')
 
     ###################################################
-    # initializing the image
-
-    # total number of pixels
-    npix = nx*ny
-
-    # one-dimensional pixel vectors
-    x_1d = np.linspace(xmin,xmax,nx)
-    y_1d = np.linspace(ymin,ymax,ny)
-
-    # two-dimensional pixel vectors
-    x2d, y2d = np.meshgrid(x_1d,y_1d,indexing='ij')
-
-    # convert from microarcseconds to radians
-    x = eh.RADPERUAS*x2d.ravel()
-    y = eh.RADPERUAS*y2d.ravel()
-
-    ###################################################
     # data bookkeeping
 
     # (u,v) coordinate info
     u = obs.data['u']
     v = obs.data['v']
     rho = np.sqrt((u**2.0) + (v**2.0))
+
+    # read in the real and imaginary parts for each data product
+    RR_real = np.real(obs.data['rrvis'])
+    RR_imag = np.imag(obs.data['rrvis'])
+    RR_real_err = obs.data['rrsigma']
+    RR_imag_err = obs.data['rrsigma']
+
+    LL_real = np.real(obs.data['llvis'])
+    LL_imag = np.imag(obs.data['llvis'])
+    LL_real_err = obs.data['llsigma']
+    LL_imag_err = obs.data['llsigma']
+
+    RL_real = np.real(obs.data['rlvis'])
+    RL_imag = np.imag(obs.data['rlvis'])
+    RL_real_err = obs.data['rlsigma']
+    RL_imag_err = obs.data['rlsigma']
+
+    LR_real = np.real(obs.data['lrvis'])
+    LR_imag = np.imag(obs.data['lrvis'])
+    LR_real_err = obs.data['lrsigma']
+    LR_imag_err = obs.data['lrsigma']
+
+    # construct masks to remove missing data
+    mask = ~np.isfinite(obs.data['rrvis'])
+    mask_RR = np.where(np.isfinite(obs.data['rrvis']))
+
+    mask = ~np.isfinite(obs.data['llvis'])
+    mask_LL = np.where(np.isfinite(obs.data['llvis']))
+
+    mask = ~np.isfinite(obs.data['rlvis'])
+    mask_RL = np.where(np.isfinite(obs.data['rlvis']))
+
+    mask = ~np.isfinite(obs.data['lrvis'])
+    mask_LR = np.where(np.isfinite(obs.data['lrvis']))
 
     # construct design matrices for gain terms
     gain_design_mat_1, gain_design_mat_2 = du.gain_design_mats(obs)
@@ -98,6 +127,32 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
     dirichlet_weights = 1.0*np.ones_like(x)
 
     ###################################################
+    # organizing image information
+
+    # total number of pixels
+    npix = nx*ny
+
+    # one-dimensional pixel vectors
+    x_1d = np.linspace(xmin,xmax,nx)
+    y_1d = np.linspace(ymin,ymax,ny)
+
+    # two-dimensional pixel vectors
+    x2d, y2d = np.meshgrid(x_1d,y_1d,indexing='ij')
+
+    # convert from microarcseconds to radians
+    x = eh.RADPERUAS*x2d.ravel()
+    y = eh.RADPERUAS*y2d.ravel()
+
+    # constructing Fourier transform matrix
+    A = np.zeros((len(u),len(x)),dtype='complex')
+    for i in range(len(u)):
+        A[i,:] = np.exp(-2.0*np.pi*(1j)*((u[i]*x) + (v[i]*y)))
+
+    # Taking a complex conjugate to account for eht-imaging internal FT convention
+    A_real = np.real(A)
+    A_imag = -np.imag(A)
+
+    ###################################################
     # setting up the model
 
     model = pm.Model()
@@ -113,7 +168,7 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
             F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate)
         else:
             F = total_flux_estimate
-        
+
         # Impose a Dirichlet prior on the pixel Stokes I intensities,
         # with summation constraint equal to the total flux
         pix = pm.Dirichlet('pix',dirichlet_weights)
@@ -359,6 +414,31 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
     ###################################################
     # fit the model
 
+    # NOTE: the current tuning scheme is rather arbitrary
+    # and could benefit from systematization
+
+    # set up tuning windows
+    windows = n_start * (2**np.arange(np.floor(np.log2((n_tune - n_burn) / n_start))))
+
+    with model:
+        start = None
+        burnin_trace = None
+
+        # burn-in and initial mass matrix tuning
+        for istep, steps in enumerate(windows):
+            step = get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
+            burnin_trace = pm.sample(start=start, tune=steps, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
+            
+            pickle.dump(burnin_trace,open('tracefile_tuning'+str(istep).zfill(2)+'.p',"wb"),protocol=pickle.HIGHEST_PROTOCOL)
+            pm.plots.traceplot(burnin_trace,varnames=['f','I','Q','U','V','right_gain_amps','left_gain_amps','right_gain_phases','left_gain_phases','right_Dterm_reals','left_Dterm_reals','right_Dterm_imags','left_Dterm_imags'])
+            plt.savefig('traceplots_tuning'+str(istep).zfill(2)+'.png',dpi=300)
+            plt.close()
+
+            start = [t[-1] for t in burnin_trace._straces.values()]
+
+        # posterior sampling
+        step = get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH)
+        trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=start, chains=1, discard_tuned_samples=False)
 
 
 
@@ -368,9 +448,7 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
 
 
 
-
-
-    return tracefile
+    return trace
 
 
 
