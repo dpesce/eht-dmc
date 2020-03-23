@@ -115,10 +115,8 @@ def FRvec(obs,ehtim_convention=True):
                                     eht-imaging pre-rotation convention
            
        Returns:
-           FR_vec_R1: right-hand field rotation corrections for the first station
-           FR_vec_R2: right-hand field rotation corrections for the second station
-           FR_vec_L1: left-hand field rotation corrections for the first station
-           FR_vec_L2: left-hand field rotation corrections for the second station
+           FR1: field rotation corrections for the first station
+           FR2: field rotation corrections for the second station
 
     """
 
@@ -161,20 +159,15 @@ def FRvec(obs,ehtim_convention=True):
     FR1 = (f_el1*el1) + (f_par1*par1) + f_off1
     FR2 = (f_el2*el2) + (f_par2*par2) + f_off2
 
-    # copy for right and left
-    FR_vec_R1 = np.copy(FR1)
-    FR_vec_R2 = np.copy(FR2)
-    FR_vec_L1 = -1.0*np.copy(FR1)
-    FR_vec_L2 = -1.0*np.copy(FR2)
+    # negate the second station to account for conjugation
+    FR2 *= -1.0
 
     # if pre-rotation has been applied, multiply by 2.0
     if ehtim_convention:
-        FR_vec_R1 *= 2.0
-        FR_vec_R2 *= 2.0
-        FR_vec_L1 *= 2.0
-        FR_vec_L2 *= 2.0
+        FR1 *= 2.0
+        FR2 *= 2.0
 
-    return FR_vec_R1, FR_vec_R2, FR_vec_L1, FR_vec_L2
+    return FR1, FR2
 
 
 

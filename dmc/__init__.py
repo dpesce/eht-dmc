@@ -17,3 +17,5 @@ from builtins import range
 from builtins import enumerate
 
 import dmc.data_utils
+import dmc.model_utils
+import dmc.models
