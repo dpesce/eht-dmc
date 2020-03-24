@@ -17,18 +17,16 @@ import ehtim as eh
 # functions
 #######################################################
 
-def gain_design_mats(obs):
-    """ Construct design matrices for gain amplitudes and phases, assuming
-        that there is a single complex gain associated with each timestamp
-        and that all gains are independent of each other
+def gain_account(obs):
+    """ Determine the total number of gains that need to be solved for
 
        Args:
            obs (obsdata): eht-imaging obsdata object containing VLBI data
            
        Returns:
-           gain_design_mat_1: gain design matrix for the first station
-           gain_design_mat_2: gain design matrix for the second station
-
+           T_gains: list of gain timestamps
+           A_gains: list of gain stations
+    
     """
 
     # get arrays of station names
@@ -52,6 +50,32 @@ def gain_design_mats(obs):
             T_gains.append(t)
     T_gains = np.array(T_gains)
     A_gains = np.array(A_gains)
+
+    return T_gains, A_gains
+
+def gain_design_mats(obs):
+    """ Construct design matrices for gain amplitudes and phases, assuming
+        that there is a single complex gain associated with each timestamp
+        and that all gains are independent of each other
+
+       Args:
+           obs (obsdata): eht-imaging obsdata object containing VLBI data
+           
+       Returns:
+           gain_design_mat_1: gain design matrix for the first station
+           gain_design_mat_2: gain design matrix for the second station
+
+    """
+
+    # get arrays of station names
+    ant1 = obs.data['t1']
+    ant2 = obs.data['t2']
+
+    # get array of times
+    time = obs.data['time']
+
+    # Determine the total number of gains that need to be solved for
+    T_gains, A_gains = gain_account(obs)
 
     # initialize design matrices
     gain_design_mat_1 = np.zeros((len(time),N_gains))
