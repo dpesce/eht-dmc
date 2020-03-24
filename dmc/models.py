@@ -110,7 +110,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
     gain_design_mat_1, gain_design_mat_2 = du.gain_design_mats(obs)
 
     # construct design matrices for leakage terms
-    dterm_design_mat_1, dterm_design_mat_2 = du.dterm_design_mats(obs)
+    stations, dterm_design_mat_1, dterm_design_mat_2 = du.dterm_design_mats(obs)
 
     # construct vectors of field rotation corrections
     FR1, FR2 = du.FRvec(obs,ehtim_convention=ehtim_convention)
@@ -118,13 +118,13 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
     # if there's no input total flux estimate, estimate it here
     if total_flux_estimate is None:
         total_flux_estimate = du.estimate_total_flux(obs)
-    
+
     ###################################################
     # organizing image information
-    
+
     # total number of pixels
     npix = nx*ny
-    
+
     # one-dimensional pixel vectors
     x_1d = np.linspace(xmin,xmax,nx)
     y_1d = np.linspace(ymin,ymax,ny)
@@ -144,7 +144,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
     # Taking a complex conjugate to account for eht-imaging internal FT convention
     A_real = np.real(A)
     A_imag = -np.imag(A)
-    
+
     ###################################################
     # organizing prior information
 
@@ -463,6 +463,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
                  'RLequal': RLequal,
                  'fit_StokesV': fit_StokesV,
                  'obs': obs,
+                 'stations': stations,
                  'T_gains': T_gains,
                  'A_gains': A_gains
                  }
