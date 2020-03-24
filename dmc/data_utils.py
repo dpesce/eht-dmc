@@ -129,7 +129,7 @@ def dterm_design_mats(obs):
         dterm_design_mat_1[ind1,istat] = 1.0
         dterm_design_mat_2[ind2,istat] = 1.0
 
-    return dterm_design_mat_1, dterm_design_mat_2
+    return stations, dterm_design_mat_1, dterm_design_mat_2
 
 def FRvec(obs,ehtim_convention=True):
     """ Construct vectors of field rotation corrections for each station and hand
