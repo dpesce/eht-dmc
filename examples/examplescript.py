@@ -96,15 +96,3 @@ for station in modelinfo['stations']:
     dtermplot = dm.plotting.plot_dterms(modelinfo,station)
     dtermplot.savefig('./dterms/dterms_'+station+'.png',dpi=300)
     plt.close(dtermplot)
-
-# energy plot
-energyplot = dm.plotting.plot_energy(modelinfo)
-energyplot.savefig('energy.png',dpi=300)
-plt.close(energyplot)
-
-# step size plot
-stepplot = dm.plotting.plot_stepsize(modelinfo)
-stepplot.savefig('step_size.png',dpi=300)
-plt.close(stepplot)
-
-
