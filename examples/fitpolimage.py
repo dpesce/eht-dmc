@@ -166,10 +166,10 @@ for it, t in enumerate(timestamps):
 T_gains = np.array(T_gains)
 A_gains = np.array(A_gains)
 
-outfile_array = np.zeros(N_gains, dtype=[('var1', 'U12'), ('var2', float)])
-outfile_array['var1'] = A_gains
-outfile_array['var2'] = T_gains
-np.savetxt('gain_translator.txt', outfile_array, fmt="%-12s %12.6f",delimiter=' ')
+# outfile_array = np.zeros(N_gains, dtype=[('var1', 'U12'), ('var2', float)])
+# outfile_array['var1'] = A_gains
+# outfile_array['var2'] = T_gains
+# np.savetxt('gain_translator.txt', outfile_array, fmt="%-12s %12.6f",delimiter=' ')
 
 # construct design matrices for gain terms
 gainamp_design_mat_R1 = np.zeros((len(u),N_gains))
