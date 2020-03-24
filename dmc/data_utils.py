@@ -76,6 +76,7 @@ def gain_design_mats(obs):
 
     # Determine the total number of gains that need to be solved for
     T_gains, A_gains = gain_account(obs)
+    N_gains = len(T_gains)
 
     # initialize design matrices
     gain_design_mat_1 = np.zeros((len(time),N_gains))
