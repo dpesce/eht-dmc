@@ -20,3 +20,4 @@ import dmc.data_utils
 import dmc.model_utils
 import dmc.models
 import dmc.plotting
+import dmc.io
