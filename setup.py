@@ -7,21 +7,20 @@ def read(fname):
 if __name__ == "__main__":
     setup(name="cqmod",
           version = "0.1dev",
-          
           author = "Dom Pesce",
           author_email = "dpesce@cfa.harvard.edu",
           description = ("Python code to perform radio interferometric imaging and "+
                          "modeling within a Bayesian framework in both "+
                          "total intensity and polarization."),
-          keywords = "interferometry",
+          license = "GPLv3",
+          keywords = "radio interferometry VLBI",
           url = "https://github.com/dpesce/DMC",
-          packages = ["DMC"],
-          long_description=read('README.txt'),
+          packages = ["dmc"],
+          long_description=read('README.md'),
           install_requires=["ehtim",
                             "pymc3",
                             "future",
                             "matplotlib",
-                            "multiprocessing",
                             "numpy",
                             "scipy",
                             "corner"]

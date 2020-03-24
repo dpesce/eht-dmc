@@ -93,16 +93,16 @@ def dterm_design_mats(obs):
     N_Dterms = len(stations)
 
     # initialize design matrices
-    Dterm_design_mat_1 = np.zeros((len(time),N_Dterms))
-    Dterm_design_mat_2 = np.zeros((len(time),N_Dterms))
+    dterm_design_mat_1 = np.zeros((len(time),N_Dterms))
+    dterm_design_mat_2 = np.zeros((len(time),N_Dterms))
 
     # fill in design matrices
     for istat,station in enumerate(stations):
         ind1 = (ant1 == station)
         ind2 = (ant2 == station)
 
-        Dterm_design_mat_1[ind1,istat] = 1.0
-        Dterm_design_mat_2[ind2,istat] = 1.0
+        dterm_design_mat_1[ind1,istat] = 1.0
+        dterm_design_mat_2[ind2,istat] = 1.0
 
     return dterm_design_mat_1, dterm_design_mat_2
 
@@ -169,5 +169,29 @@ def FRvec(obs,ehtim_convention=True):
 
     return FR1, FR2
 
+def estimate_total_flux(obs):
+    """ Estimate the total flux of an object
 
+       Args:
+           obs (obsdata): eht-imaging obsdata object containing VLBI data
+           
+       Returns:
+           total_flux_estimate: estimate of the total source flux (Jy)
 
+    """
+
+    # (u,v) coordinate info
+    u = obs.data['u']
+    v = obs.data['v']
+    rho = np.sqrt((u**2.0) + (v**2.0))
+
+    # determine the smallest (u,v) point
+    ind = np.argmin(rho)
+
+    # set the polrep to be stokes
+    obs = obs.switch_polrep('stokes')
+
+    # get flux at that point
+    total_flux_estimate = np.abs(obs.data['vis'][ind])
+
+    return total_flux_estimate
