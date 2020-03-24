@@ -58,14 +58,6 @@ dm.io.save_model(modelinfo,'modelinfo.p')
 #######################################################
 # make a bunch of summary plots
 
-# modelinfo = dm.io.load_model('modelinfo.p')
-# T_gains, A_gains = dm.data_utils.gain_account(obs)
-# modelinfo.update({'T_gains':T_gains,'A_gains':A_gains})
-# ant1 = obs.data['t1']
-# ant2 = obs.data['t2']
-# stations = np.unique(np.concatenate((ant1,ant2)))
-# modelinfo.update({'stations':stations})
-
 # trace plots
 dm.plotting.plot_trace(modelinfo,var_names=['f','I','Q','U','V','right_gain_amps','left_gain_amps','right_gain_phases','left_gain_phases','right_Dterm_reals','left_Dterm_reals','right_Dterm_imags','left_Dterm_imags'])
 plt.savefig('traceplots.png',dpi=300)
