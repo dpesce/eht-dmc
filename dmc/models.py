@@ -26,7 +26,7 @@ EARLY_MAX_TREEDEPTH = 10
 # functions
 #######################################################
 
-def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
+def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
           fit_StokesV=True,fit_total_flux=False,n_start=25,n_burn=500,n_tune=5000,
           ntuning=2000,ntrials=10000,**kwargs):
     """ Fit a polarimetric image (i.e., Stokes I, Q, U, and V) to a VLBI observation
@@ -106,6 +106,7 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
     mask_LR = np.where(np.isfinite(obs.data['lrvis']))
 
     # construct design matrices for gain terms
+    T_gains, A_gains = du.gain_account(obs)
     gain_design_mat_1, gain_design_mat_2 = du.gain_design_mats(obs)
 
     # construct design matrices for leakage terms
@@ -117,13 +118,13 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
     # if there's no input total flux estimate, estimate it here
     if total_flux_estimate is None:
         total_flux_estimate = du.estimate_total_flux(obs)
-
+    
     ###################################################
     # organizing image information
-
+    
     # total number of pixels
     npix = nx*ny
-
+    
     # one-dimensional pixel vectors
     x_1d = np.linspace(xmin,xmax,nx)
     y_1d = np.linspace(ymin,ymax,ny)
@@ -143,7 +144,7 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
     # Taking a complex conjugate to account for eht-imaging internal FT convention
     A_real = np.real(A)
     A_imag = -np.imag(A)
-
+    
     ###################################################
     # organizing prior information
 
@@ -428,6 +429,7 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
     # set up tuning windows
     windows = n_start * (2**np.arange(np.floor(np.log2((n_tune - n_burn) / n_start))))
 
+    # keep track of the tuning runs
     tuning_trace_list = list()
     with model:
         start = None
@@ -459,7 +461,10 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
                  'ntuning': ntuning,
                  'ntrials': ntrials,
                  'RLequal': RLequal,
-                 'fit_StokesV': fit_StokesV
+                 'fit_StokesV': fit_StokesV,
+                 'obs': obs,
+                 'T_gains': T_gains,
+                 'A_gains': A_gains
                  }
 
     return modelinfo
