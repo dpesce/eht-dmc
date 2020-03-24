@@ -28,7 +28,7 @@ EARLY_MAX_TREEDEPTH = 10
 
 def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
           fit_StokesV=True,fit_total_flux=False,n_start=25,n_burn=500,n_tune=5000,
-          **kwargs):
+          ntuning=2000,ntrials=10000,**kwargs):
     """ Fit a polarimetric image (i.e., Stokes I, Q, U, and V) to a VLBI observation
 
        Args:
@@ -49,6 +49,9 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
            n_start (int): initial number of default tuning steps
            n_burn (int): number of burn-in steps
            n_tune (int): number of mass matrix tuning steps
+
+           ntuning (int): number of tuning steps to take during last leg
+           ntrials (int): number of posterior samples to take
            
        Returns:
            trace (trace): a pymc3 trace object containin the model fit
@@ -58,6 +61,7 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
     # some kwarg default values
     ehtim_convention = kwargs.get('ehtim_convention', True)
     ref_station = kwargs.get('ref_station','AA')
+    regularize = kwargs.get('regularize',True)
 
     ###################################################
     # data bookkeeping
@@ -115,18 +119,6 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
         total_flux_estimate = du.estimate_total_flux(obs)
 
     ###################################################
-    # organizing prior information
-
-    # prior info for log gain amplitudes
-    loggainamp_mean, loggainamp_std = mu.gain_logamp_prior(obs)
-
-    # prior info for gain phases
-    gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,ref_station=ref_station)
-
-    # specify the Dirichlet weights; 1 = flat; <1 = sparse; >1 = smooth
-    dirichlet_weights = 1.0*np.ones_like(x)
-
-    ###################################################
     # organizing image information
 
     # total number of pixels
@@ -153,7 +145,23 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
     A_imag = -np.imag(A)
 
     ###################################################
+    # organizing prior information
+
+    # prior info for log gain amplitudes
+    loggainamp_mean, loggainamp_std = mu.gain_logamp_prior(obs)
+    
+    # prior info for gain phases
+    gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,ref_station=ref_station)
+
+    # specify the Dirichlet weights; 1 = flat; <1 = sparse; >1 = smooth
+    dirichlet_weights = 1.0*np.ones_like(x)
+
+    ###################################################
     # setting up the model
+
+    # number of gains and dterms
+    N_Dterms = dterm_design_mat_1.shape[1]
+    N_gains = len(loggainamp_mean)
 
     model = pm.Model()
 
@@ -426,27 +434,13 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
 
         # burn-in and initial mass matrix tuning
         for istep, steps in enumerate(windows):
-            step = get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
+            step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
             burnin_trace = pm.sample(start=start, tune=steps, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
-            
-            pickle.dump(burnin_trace,open('tracefile_tuning'+str(istep).zfill(2)+'.p',"wb"),protocol=pickle.HIGHEST_PROTOCOL)
-            pm.plots.traceplot(burnin_trace,varnames=['f','I','Q','U','V','right_gain_amps','left_gain_amps','right_gain_phases','left_gain_phases','right_Dterm_reals','left_Dterm_reals','right_Dterm_imags','left_Dterm_imags'])
-            plt.savefig('traceplots_tuning'+str(istep).zfill(2)+'.png',dpi=300)
-            plt.close()
-
             start = [t[-1] for t in burnin_trace._straces.values()]
 
         # posterior sampling
-        step = get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH)
+        step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH)
         trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=start, chains=1, discard_tuned_samples=False)
-
-
-
-
-
-
-
-
 
     return trace
 
