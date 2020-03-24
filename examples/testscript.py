@@ -48,26 +48,57 @@ ymax = 30.0
 ntuning = 2000
 ntrials = 10000
 
+"""
 # perform the model-fitting (note: takes a long time!)
-modelinfo = dm.models.polim(obs,nx,ny,xmin,xmax,ymin,ymax,ntuning=ntuning,ntrials=ntrials)
+modelinfo = dm.models.polimage(obs,nx,ny,xmin,xmax,ymin,ymax,ntuning=ntuning,ntrials=ntrials,total_flux_estimate=0.6)
 
 # saving the trace file
 pickle.dump(modelinfo,open('modelinfo.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
+"""
 
 #######################################################
 # create some summary plots
 
-# modelinfo = pickle.load(open('modelinfo.p','rb'))
+modelinfo = pickle.load(open('modelinfo.p','rb'))
+T_gains, A_gains = dm.data_utils.gain_account(obs)
+modelinfo.update({'T_gains':T_gains,'A_gains':A_gains})
 
+"""
 # save a set of trace plots
 dm.plotting.plot_trace(modelinfo,var_names=['f','I','Q','U','V','right_gain_amps','left_gain_amps','right_gain_phases','left_gain_phases','right_Dterm_reals','left_Dterm_reals','right_Dterm_imags','left_Dterm_imags'])
 plt.savefig('traceplots.png',dpi=300)
 plt.close()
+"""
 
-# save Stokes I plots
-dm.plotting.plot_image(modelinfo,'I','mean')
-plt.savefig('StokesI_mean.png',dpi=300)
-plt.close()
+"""
+# save Stokes plots
+for stokes in ['I','Q','U','V']:
+
+    # plot mean image
+    imageplot_mean = dm.plotting.plot_image(modelinfo,stokes,'mean',title='Stokes '+stokes+' mean image')
+    imageplot_mean.savefig('Stokes'+stokes+'_mean.png',dpi=300)
+    plt.close(imageplot_mean)
+
+    # plot snr image
+    imageplot_snr = dm.plotting.plot_image(modelinfo,stokes,'snr',title='Stokes '+stokes+' SNR image')
+    imageplot_snr.savefig('Stokes'+stokes+'_snr.png',dpi=300)
+    plt.close(imageplot_snr)
+"""
+
+# save gain plots
+gainplot_amps = dm.plotting.plot_gains(modelinfo,'amp')
+gainplot_amps.savefig('gainplot_amps.png',dpi=300)
+plt.close(gainplot_amps)
+
+gainplot_phases = dm.plotting.plot_gains(modelinfo,'phase')
+gainplot_phases.savefig('gainplot_phases.png',dpi=300)
+plt.close(gainplot_phases)
+
+
+
+
+
+
 
 
 
