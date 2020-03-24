@@ -428,6 +428,7 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
     # set up tuning windows
     windows = n_start * (2**np.arange(np.floor(np.log2((n_tune - n_burn) / n_start))))
 
+    tuning_trace_list = list()
     with model:
         start = None
         burnin_trace = None
@@ -437,12 +438,31 @@ def polim(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
             step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
             burnin_trace = pm.sample(start=start, tune=steps, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
             start = [t[-1] for t in burnin_trace._straces.values()]
+            tuning_trace_list.append(burnin_trace)
 
         # posterior sampling
         step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH)
         trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=start, chains=1, discard_tuned_samples=False)
 
-    return trace
+    ###################################################
+    # package the model info
+
+    modelinfo = {'trace': trace,
+                 'tuning_traces': tuning_trace_list,
+                 'nx': nx,
+                 'ny': ny,
+                 'xmin': xmin,
+                 'xmax': xmax,
+                 'ymin': ymin,
+                 'ymax': ymax,
+                 'total_flux_estimate': total_flux_estimate,
+                 'ntuning': ntuning,
+                 'ntrials': ntrials,
+                 'RLequal': RLequal,
+                 'fit_StokesV': fit_StokesV
+                 }
+
+    return modelinfo
 
 
 

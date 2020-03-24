@@ -23,5 +23,6 @@ if __name__ == "__main__":
                             "matplotlib",
                             "numpy",
                             "scipy",
-                            "corner"]
+                            "corner",
+                            "ehtplot"]
     )
