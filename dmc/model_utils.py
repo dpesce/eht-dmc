@@ -129,7 +129,7 @@ def gain_phase_prior(obs,ref_station='AA'):
         ants_here = A_gains[index]
         for ant in ants_here:
             if ant == ref_station:
-                ind = ((T_gains == t) & (A_gains == key))
+                ind = ((T_gains == t) & (A_gains == ant))
                 gainphase_kappa[ind] = 10000.0
                 break
 
