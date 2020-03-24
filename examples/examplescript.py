@@ -53,7 +53,7 @@ ntrials = 10000
 total_flux_estimate = 0.4
 
 # perform the model-fitting (note: takes a long time!)
-modelinfo = dm.models.polimage(obs,nx,ny,xmin,xmax,ymin,ymax,ntuning=ntuning,ntrials=ntrials,total_flux_estimate=total_flux_estimate)
+modelinfo = dm.models.polimage(obs,nx,ny,xmin,xmax,ymin,ymax,ntuning=ntuning,ntrials=ntrials,total_flux_estimate=total_flux_estimate,ref_station='AA')
 
 # save the model file
 dm.io.save_model(modelinfo,'modelinfo.p')

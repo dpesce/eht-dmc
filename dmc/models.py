@@ -54,7 +54,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
            ntrials (int): number of posterior samples to take
            
        Returns:
-           trace (trace): a pymc3 trace object containin the model fit
+           modelinfo: a dictionary object containing the model fit information
 
     """
 
@@ -171,11 +171,13 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
         ###############################################
         # set the priors for the image parameters
         
-        # set the total flux prior to be normal around the correct value
+        # total flux prior
         if fit_total_flux:
+            # set to be normal around the correct value, but bounded positive
             BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
             F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate)
         else:
+            # fix at input value
             F = total_flux_estimate
 
         # Impose a Dirichlet prior on the pixel Stokes I intensities,
@@ -190,10 +192,12 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
         alpha = pm.VonMises('alpha',mu=0.0,kappa=0.0001,shape=npix)
         EVPA = pm.Deterministic('EVPA',alpha/2.0)
 
-        # sample cos(beta) uniformly on [-1,1]
+        # circular polarization angle
         if fit_StokesV:
+            # sample cos(beta) uniformly on [-1,1]
             cosbeta = pm.Uniform('cosbeta',lower=-1.0,upper=1.0,shape=npix)
         else:
+            # fix to be zero
             cosbeta = 0.0
         sinbeta = pm.math.sqrt(1.0 - (cosbeta**2.0))
 

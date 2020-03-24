@@ -26,7 +26,7 @@ def plot_trace(modelinfo,**kwargs):
     """ Plot parameter traces
 
        Args:
-           modelinfo (modelinfo): dmc modelinfo object
+           modelinfo (dict): dmc modelinfo dictionary
            
        Returns:
            traceplot: figure containing the trace plot
@@ -41,7 +41,7 @@ def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
     """ Plot image pixel parameters
 
        Args:
-           modelinfo (modelinfo): dmc modelinfo object
+           modelinfo (dict): dmc modelinfo dictionary
            imtype (str): the type of image to plot; choices are I, Q, U, V, p, EVPA
            moment (str): the type of posterior moment to plot; choices are mean, median, std, snr
            burnin (int): length of burn-in
@@ -144,7 +144,7 @@ def plot_gains(modelinfo,gaintype,burnin=0):
     """ Plot gain amplitudes or phrases over time for each station
 
        Args:
-           modelinfo (modelinfo): dmc modelinfo object
+           modelinfo (dict): dmc modelinfo dictionary
            gain (str): the type of gain to plot; choices are amp, phase
            burnin (int): length of burn-in
            
@@ -256,7 +256,7 @@ def gain_cornerplots(modelinfo,gaintype,burnin=0,dirname=None,levels=None,smooth
     """ Make a cornerplot of the gain amplitudes or phases for all timestamps
 
        Args:
-           modelinfo (modelinfo): dmc modelinfo object
+           modelinfo (dict): dmc modelinfo dictionary
            gain (str): the type of gain to plot; choices are amp, phase
            burnin (int): length of burn-in
            dirname (str): name of the directory in which to save the cornerplots
@@ -355,7 +355,7 @@ def plot_dterms(modelinfo,station,burnin=0,print_dterms=True,levels=None,smooth=
     """ Plot right and left D-terms for a single station
 
        Args:
-           modelinfo (modelinfo): dmc modelinfo object
+           modelinfo (dict): dmc modelinfo dictionary
            station (str): the station whose D-terms to plot
            burnin (int): length of burn-in
            print_dterms (bool): flag to print the D-terms and uncertainties on the plot
@@ -450,7 +450,7 @@ def plot_energy(modelinfo,burnin=0):
     """ Plot HMC energy distribution
 
        Args:
-           modelinfo (modelinfo): dmc modelinfo object
+           modelinfo (dict): dmc modelinfo dictionary
            burnin (int): length of burn-in
            
        Returns:
@@ -498,7 +498,7 @@ def plot_stepsize(modelinfo,burnin=0):
     """ Plot step size of chain
 
        Args:
-           modelinfo (modelinfo): dmc modelinfo object
+           modelinfo (dict): dmc modelinfo dictionary
            burnin (int): length of burn-in
            
        Returns:

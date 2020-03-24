@@ -22,7 +22,7 @@ def save_model(modelinfo,outfile):
     """ Save a model as a binary pickle file
 
        Args:
-           modelinfo (modelinfo): dmc modelinfo object
+           modelinfo (dict): dmc modelinfo dictionary
            outfile (str): name of output file
            
        Returns:
@@ -40,7 +40,7 @@ def load_model(infile):
            infile (str): name of model file
            
        Returns:
-           modelinfo: dmc modelinfo object
+           modelinfo (dict): dmc modelinfo dictionary
     
     """
 
