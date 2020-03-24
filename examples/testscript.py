@@ -36,8 +36,8 @@ obs = obs.flag_bl(['JC','SM'])
 # fit a polarized image model
 
 # number of pixels in each dimension
-nx = 6
-ny = 6
+nx = 12
+ny = 12
 
 # axis ranges in each dimension
 xmin = -30.0
@@ -49,26 +49,23 @@ ymax = 30.0
 ntuning = 2000
 ntrials = 10000
 
-"""
 # perform the model-fitting (note: takes a long time!)
 modelinfo = dm.models.polimage(obs,nx,ny,xmin,xmax,ymin,ymax,ntuning=ntuning,ntrials=ntrials,total_flux_estimate=0.6)
 
 # save the model file
 dm.io.save_model(modelinfo,'modelinfo.p')
-"""
 
 #######################################################
 # make a bunch of summary plots
 
-modelinfo = dm.io.load_model('modelinfo.p')
-T_gains, A_gains = dm.data_utils.gain_account(obs)
-modelinfo.update({'T_gains':T_gains,'A_gains':A_gains})
-ant1 = obs.data['t1']
-ant2 = obs.data['t2']
-stations = np.unique(np.concatenate((ant1,ant2)))
-modelinfo.update({'stations':stations})
+# modelinfo = dm.io.load_model('modelinfo.p')
+# T_gains, A_gains = dm.data_utils.gain_account(obs)
+# modelinfo.update({'T_gains':T_gains,'A_gains':A_gains})
+# ant1 = obs.data['t1']
+# ant2 = obs.data['t2']
+# stations = np.unique(np.concatenate((ant1,ant2)))
+# modelinfo.update({'stations':stations})
 
-"""
 # trace plots
 dm.plotting.plot_trace(modelinfo,var_names=['f','I','Q','U','V','right_gain_amps','left_gain_amps','right_gain_phases','left_gain_phases','right_Dterm_reals','left_Dterm_reals','right_Dterm_imags','left_Dterm_imags'])
 plt.savefig('traceplots.png',dpi=300)
@@ -117,14 +114,5 @@ plt.close(energyplot)
 stepplot = dm.plotting.plot_stepsize(modelinfo)
 stepplot.savefig('step_size.png',dpi=300)
 plt.close(stepplot)
-"""
-
-#######################################################
-# save useful files
-
-
-
-
-
 
 
