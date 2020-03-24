@@ -12,7 +12,7 @@ import os
 # loading in data
 
 # convert uvfits file to ehtim obsdata object
-obsfile = 'hops_lo_3600_M87+zbl-dtcal_selfcal.uvfits'
+obsfile = 'synthetic_data.uvfits'
 obs = eh.obsdata.load_uvfits(obsfile,polrep='circ')
 
 # convert antenna file to ehtim array object
@@ -36,21 +36,24 @@ obs = obs.flag_bl(['JC','SM'])
 # fit a polarized image model
 
 # number of pixels in each dimension
-nx = 12
-ny = 12
+nx = 6
+ny = 6
 
 # axis ranges in each dimension
-xmin = -30.0
-xmax = 30.0
-ymin = -30.0
-ymax = 30.0
+xmin = -20.0
+xmax = 20.0
+ymin = -20.0
+ymax = 20.0
 
 # set number of burn-in, tuning, and sampling steps
 ntuning = 2000
 ntrials = 10000
 
+# estimate the total flux, in Jy
+total_flux_estimate = 0.4
+
 # perform the model-fitting (note: takes a long time!)
-modelinfo = dm.models.polimage(obs,nx,ny,xmin,xmax,ymin,ymax,ntuning=ntuning,ntrials=ntrials,total_flux_estimate=0.6)
+modelinfo = dm.models.polimage(obs,nx,ny,xmin,xmax,ymin,ymax,ntuning=ntuning,ntrials=ntrials,total_flux_estimate=total_flux_estimate)
 
 # save the model file
 dm.io.save_model(modelinfo,'modelinfo.p')
