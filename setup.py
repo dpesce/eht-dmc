@@ -5,7 +5,7 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 if __name__ == "__main__":
-    setup(name="cqmod",
+    setup(name="eht-dmc",
           version = "0.1dev",
           author = "Dom Pesce",
           author_email = "dpesce@cfa.harvard.edu",
