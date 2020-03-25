@@ -26,6 +26,236 @@ EARLY_MAX_TREEDEPTH = 10
 # functions
 #######################################################
 
+def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
+          fit_total_flux=False,n_start=25,n_burn=500,n_tune=5000,
+          ntuning=2000,ntrials=10000,**kwargs):
+    """ Fit a Stokes I image to a VLBI observation
+
+       Args:
+           obs (obsdata): eht-imaging obsdata object containing VLBI data
+           nx (int): number of image pixels in the x-direction
+           ny (int): number of image pixels in the y-direction
+           xmin(float): minimum x pixel value (uas)
+           xmax(float): maximum x pixel value (uas)
+           ymin(float): minimum y pixel value (uas)
+           ymax(float): maximum x pixel value (uas)
+           
+           total_flux_estimate (float): estimate of total Stokes I image flux (Jy)
+                      
+           fit_total_flux (bool): flag to fit for the total flux
+            
+           n_start (int): initial number of default tuning steps
+           n_burn (int): number of burn-in steps
+           n_tune (int): number of mass matrix tuning steps
+
+           ntuning (int): number of tuning steps to take during last leg
+           ntrials (int): number of posterior samples to take
+           
+       Returns:
+           modelinfo: a dictionary object containing the model fit information
+
+    """
+
+    # some kwarg default values
+    ehtim_convention = kwargs.get('ehtim_convention', True)
+    ref_station = kwargs.get('ref_station','AA')
+    regularize = kwargs.get('regularize',True)
+
+    ###################################################
+    # data bookkeeping
+
+    # first, make sure we're using a Stokes representation
+    if obs.polrep is not 'stokes':
+        obs = obs.switch_polrep('stokes')
+
+    # (u,v) coordinate info
+    u = obs.data['u']
+    v = obs.data['v']
+    rho = np.sqrt((u**2.0) + (v**2.0))
+
+    # read in the real and imaginary visibilities
+    I_real = np.real(obs.data['vis'])
+    I_imag = np.imag(obs.data['vis'])
+    I_real_err = obs.data['sigma']
+    I_imag_err = obs.data['sigma']
+
+    # construct mask to remove missing data
+    mask = np.where(np.isfinite(obs.data['vis']))
+
+    # construct design matrices for gain terms
+    T_gains, A_gains = du.gain_account(obs)
+    gain_design_mat_1, gain_design_mat_2 = du.gain_design_mats(obs)
+
+    # if there's no input total flux estimate, estimate it here
+    if total_flux_estimate is None:
+        total_flux_estimate = du.estimate_total_flux(obs)
+
+    ###################################################
+    # organizing image information
+
+    # total number of pixels
+    npix = nx*ny
+
+    # one-dimensional pixel vectors
+    x_1d = np.linspace(xmin,xmax,nx)
+    y_1d = np.linspace(ymin,ymax,ny)
+
+    # two-dimensional pixel vectors
+    x2d, y2d = np.meshgrid(x_1d,y_1d,indexing='ij')
+
+    # convert from microarcseconds to radians
+    x = eh.RADPERUAS*x2d.ravel()
+    y = eh.RADPERUAS*y2d.ravel()
+
+    # constructing Fourier transform matrix
+    A = np.zeros((len(u),len(x)),dtype='complex')
+    for i in range(len(u)):
+        A[i,:] = np.exp(-2.0*np.pi*(1j)*((u[i]*x) + (v[i]*y)))
+
+    # Taking a complex conjugate to account for eht-imaging internal FT convention
+    A_real = np.real(A)
+    A_imag = -np.imag(A)
+
+    ###################################################
+    # organizing prior information
+
+    # prior info for log gain amplitudes
+    loggainamp_mean, loggainamp_std = mu.gain_logamp_prior(obs)
+    
+    # prior info for gain phases
+    gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,ref_station=ref_station)
+
+    # specify the Dirichlet weights; 1 = flat; <1 = sparse; >1 = smooth
+    dirichlet_weights = 1.0*np.ones_like(x)
+
+    ###################################################
+    # setting up the model
+
+    # number of gains
+    N_gains = len(loggainamp_mean)
+
+    model = pm.Model()
+
+    with model:
+
+        ###############################################
+        # set the priors for the image parameters
+        
+        # total flux prior
+        if fit_total_flux:
+            # set to be normal around the correct value, but bounded positive
+            BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
+            F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate)
+        else:
+            # fix at input value
+            F = total_flux_estimate
+
+        # Impose a Dirichlet prior on the pixel intensities,
+        # with summation constraint equal to the total flux
+        pix = pm.Dirichlet('pix',dirichlet_weights)
+        I = pm.Deterministic('I',pix*F)
+
+        # set the prior on the systematic error term to be uniform on [0,1]
+        f = pm.Uniform('f',lower=0.0,upper=1.0)
+
+        ###############################################
+        # set the priors for the gain parameters
+
+        # set the gain amplitude priors to be log-normal around the specified inputs
+        logg = pm.Normal('logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
+        g = pm.Deterministic('gain_amps',pm.math.exp(logg))
+        
+        # set the gain phase priors to be periodic uniform on (-pi,pi)
+        theta = pm.VonMises('gain_phases',mu=gainphase_mu,kappa=gainphase_kappa,shape=N_gains)
+
+        ###############################################
+        # perform the required Fourier transforms
+        
+        Ireal_pregain = pm.math.dot(A_real,I)
+        Iimag_pregain = pm.math.dot(A_imag,I)
+
+        ###############################################
+        # compute the corruption terms
+
+        gainamp_1 = pm.math.exp(pm.math.dot(gain_design_mat_1,logg))
+        gainamp_2 = pm.math.exp(pm.math.dot(gain_design_mat_2,logg))
+
+        gainphase_1 = pm.math.dot(gain_design_mat_1,theta)
+        gainphase_2 = pm.math.dot(gain_design_mat_2,theta)
+
+        ###############################################
+        # apply corruptions to the model visibilities
+
+        Ireal_model = gainamp_1*gainamp_2*((pm.math.cos(gainphase_1 - gainphase_2)*Ireal_pregain) - (pm.math.sin(gainphase_1 - gainphase_2)*Iimag_pregain))
+        Iimag_model = gainamp_1*gainamp_2*((pm.math.cos(gainphase_1 - gainphase_2)*Iimag_pregain) + (pm.math.sin(gainphase_1 - gainphase_2)*Ireal_pregain))
+
+        ###############################################
+        # add in the systematic noise component
+
+        Ireal_err_model = pm.math.sqrt((I_real_err**2.0) + (f*F)**2.0)
+        Iimag_err_model = pm.math.sqrt((I_imag_err**2.0) + (f*F)**2.0)
+
+        ###############################################
+        # define the likelihood
+
+        L_real = pm.Normal('L_real',mu=Ireal_model[mask],sd=Ireal_err_model[mask],observed=I_real[mask])
+        L_imag = pm.Normal('L_imag',mu=Iimag_model[mask],sd=Iimag_err_model[mask],observed=I_imag[mask])
+
+        ###############################################
+        # keep track of summed-squared residuals (ssr)
+
+        ssr = pm.Deterministic('ssr',pm.math.sum((((Ireal_model[mask]-I_real[mask])/Ireal_err_model[mask])**2.0) + (((Iimag_model[mask]-I_imag[mask])/Iimag_err_model[mask])**2.0)))
+
+    ###################################################
+    # fit the model
+
+    # NOTE: the current tuning scheme is rather arbitrary
+    # and could likely benefit from systematization
+
+    # set up tuning windows
+    windows = n_start * (2**np.arange(np.floor(np.log2((n_tune - n_burn) / n_start))))
+
+    # keep track of the tuning runs
+    tuning_trace_list = list()
+    with model:
+        start = None
+        burnin_trace = None
+
+        # burn-in and initial mass matrix tuning
+        for istep, steps in enumerate(windows):
+            step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
+            burnin_trace = pm.sample(start=start, tune=steps, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
+            start = [t[-1] for t in burnin_trace._straces.values()]
+            tuning_trace_list.append(burnin_trace)
+
+        # posterior sampling
+        step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH)
+        trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=start, chains=1, discard_tuned_samples=False)
+
+    ###################################################
+    # package the model info
+
+    modelinfo = {'modeltype': 'image',
+                 'model': model,
+                 'trace': trace,
+                 'tuning_traces': tuning_trace_list,
+                 'nx': nx,
+                 'ny': ny,
+                 'xmin': xmin,
+                 'xmax': xmax,
+                 'ymin': ymin,
+                 'ymax': ymax,
+                 'total_flux_estimate': total_flux_estimate,
+                 'ntuning': ntuning,
+                 'ntrials': ntrials,
+                 'obs': obs,
+                 'stations': stations,
+                 'T_gains': T_gains,
+                 'A_gains': A_gains
+                 }
+
+    return modelinfo
+
 def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
           fit_StokesV=True,fit_total_flux=False,n_start=25,n_burn=500,n_tune=5000,
           ntuning=2000,ntrials=10000,**kwargs):
@@ -97,16 +327,9 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
     LR_imag_err = obs.data['lrsigma']
 
     # construct masks to remove missing data
-    mask = ~np.isfinite(obs.data['rrvis'])
     mask_RR = np.where(np.isfinite(obs.data['rrvis']))
-
-    mask = ~np.isfinite(obs.data['llvis'])
     mask_LL = np.where(np.isfinite(obs.data['llvis']))
-
-    mask = ~np.isfinite(obs.data['rlvis'])
     mask_RL = np.where(np.isfinite(obs.data['rlvis']))
-
-    mask = ~np.isfinite(obs.data['lrvis'])
     mask_LR = np.where(np.isfinite(obs.data['lrvis']))
 
     # construct design matrices for gain terms
@@ -601,7 +824,7 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,
         else:
             # fix at input value
             I = total_flux_estimate
-            
+
             # hack to keep track of I
             Iout = pm.Deterministic('I',pm.math.sqrt(I**2.0))
         

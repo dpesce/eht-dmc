@@ -205,19 +205,20 @@ def estimate_total_flux(obs):
            total_flux_estimate: estimate of the total source flux (Jy)
 
     """
-
+    
     # (u,v) coordinate info
     u = obs.data['u']
     v = obs.data['v']
     rho = np.sqrt((u**2.0) + (v**2.0))
-
+    
     # determine the smallest (u,v) point
     ind = np.argmin(rho)
-
+    
     # set the polrep to be stokes
-    obs = obs.switch_polrep('stokes')
+    if obs.polrep is not 'stokes':
+        obs = obs.switch_polrep('stokes')
 
-    # get flux at that point
+    # get flux at the smallest point
     total_flux_estimate = np.abs(obs.data['vis'][ind])
 
     return total_flux_estimate

@@ -59,9 +59,10 @@ def make_image(modelinfo,moment,burnin=0):
            
        Returns:
            im: ehtim image object
-
+    
     """
-
+    if modelinfo['modeltype'] not in ['image','polimage']:
+        raise Exception('modeltype is not image or polimage!')
     if moment not in ['mean','median','std','snr']:
         raise Exception('moment ' + moment + ' not recognized!')
 
@@ -103,38 +104,44 @@ def make_image(modelinfo,moment,burnin=0):
 
     # remove burnin
     I = trace['I'][burnin:]
-    Q = trace['Q'][burnin:]
-    U = trace['U'][burnin:]
-    V = trace['V'][burnin:]
+    if modelinfo['modeltype'] is 'polimage':
+        Q = trace['Q'][burnin:]
+        U = trace['U'][burnin:]
+        V = trace['V'][burnin:]
 
     # remove divergences
     div_mask = np.invert(trace[burnin:].diverging)
     I = I[div_mask]
-    Q = Q[div_mask]
-    U = U[div_mask]
-    V = V[div_mask]
+    if modelinfo['modeltype'] is 'polimage':
+        Q = Q[div_mask]
+        U = U[div_mask]
+        V = V[div_mask]
 
     # reshape array
     if moment == 'mean':
         Ivec = np.mean(I,axis=0).reshape((nx,ny))
-        Qvec = np.mean(Q,axis=0).reshape((nx,ny))
-        Uvec = np.mean(U,axis=0).reshape((nx,ny))
-        Vvec = np.mean(V,axis=0).reshape((nx,ny))
+        if modelinfo['modeltype'] is 'polimage':
+            Qvec = np.mean(Q,axis=0).reshape((nx,ny))
+            Uvec = np.mean(U,axis=0).reshape((nx,ny))
+            Vvec = np.mean(V,axis=0).reshape((nx,ny))
     elif moment == 'median':
         Ivec = np.median(I,axis=0).reshape((nx,ny))
-        Qvec = np.median(Q,axis=0).reshape((nx,ny))
-        Uvec = np.median(U,axis=0).reshape((nx,ny))
-        Vvec = np.median(V,axis=0).reshape((nx,ny))
+        if modelinfo['modeltype'] is 'polimage':
+            Qvec = np.median(Q,axis=0).reshape((nx,ny))
+            Uvec = np.median(U,axis=0).reshape((nx,ny))
+            Vvec = np.median(V,axis=0).reshape((nx,ny))
     elif moment == 'std':
         Ivec = np.std(I,axis=0).reshape((nx,ny))
-        Qvec = np.std(Q,axis=0).reshape((nx,ny))
-        Uvec = np.std(U,axis=0).reshape((nx,ny))
-        Vvec = np.std(V,axis=0).reshape((nx,ny))
+        if modelinfo['modeltype'] is 'polimage':
+            Qvec = np.std(Q,axis=0).reshape((nx,ny))
+            Uvec = np.std(U,axis=0).reshape((nx,ny))
+            Vvec = np.std(V,axis=0).reshape((nx,ny))
     elif moment == 'snr':
         Ivec = np.mean(I,axis=0).reshape((nx,ny)) / np.std(I,axis=0).reshape((nx,ny))
-        Qvec = np.mean(Q,axis=0).reshape((nx,ny)) / np.std(Q,axis=0).reshape((nx,ny))
-        Uvec = np.mean(U,axis=0).reshape((nx,ny)) / np.std(U,axis=0).reshape((nx,ny))
-        Vvec = np.mean(V,axis=0).reshape((nx,ny)) / np.std(V,axis=0).reshape((nx,ny))
+        if modelinfo['modeltype'] is 'polimage':
+            Qvec = np.mean(Q,axis=0).reshape((nx,ny)) / np.std(Q,axis=0).reshape((nx,ny))
+            Uvec = np.mean(U,axis=0).reshape((nx,ny)) / np.std(U,axis=0).reshape((nx,ny))
+            Vvec = np.mean(V,axis=0).reshape((nx,ny)) / np.std(V,axis=0).reshape((nx,ny))
 
     ###################################################
     # create eht-imaging image object
@@ -145,9 +152,10 @@ def make_image(modelinfo,moment,burnin=0):
 
     # populate image
     im.ivec = Ivec.T[::-1,::-1].ravel()
-    im.qvec = Qvec.T[::-1,::-1].ravel()
-    im.uvec = Uvec.T[::-1,::-1].ravel()
-    im.vvec = Vvec.T[::-1,::-1].ravel()
+    if modelinfo['modeltype'] is 'polimage':
+        im.qvec = Qvec.T[::-1,::-1].ravel()
+        im.uvec = Uvec.T[::-1,::-1].ravel()
+        im.vvec = Vvec.T[::-1,::-1].ravel()
 
     return im
 
@@ -164,10 +172,10 @@ def save_fits(modelinfo,moment,outfile,burnin=0):
            None
 
     """
-    
+
     # create eht-imaging image object
     im = make_image(modelinfo,moment,burnin=burnin)
-    
+
     # save it
     im.save_fits(outfile)
 

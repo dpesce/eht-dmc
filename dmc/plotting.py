@@ -54,10 +54,14 @@ def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
 
     """
 
+    if modelinfo['modeltype'] not in ['image','polimage']:
+        raise Exception('modeltype is not image or polimage!')
     if imtype not in ['I','Q','U','V','p','EVPA']:
         raise Exception('imtype ' + imtype + ' not recognized!')
     if moment not in ['mean','median','std','snr']:
         raise Exception('moment ' + moment + ' not recognized!')
+    if (modelinfo['modeltype'] == 'image') & (imtype != 'I'):
+        raise Exception('modeltype image does not contain '+imtype+'!')
 
     ###################################################
     # organizing image information
@@ -164,6 +168,8 @@ def plot_polimage(modelinfo,moment,burnin=0,regrid=64,smooth=0.0,pcut=0.1,skip=4
 
     """
 
+    if modelinfo['modeltype'] is not 'polimage':
+        raise Exception('modeltype is not polimage!')
     if moment not in ['mean','median','std','snr']:
         raise Exception('moment ' + moment + ' not recognized!')
 
