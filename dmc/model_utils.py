@@ -77,7 +77,7 @@ def gain_logamp_prior(obs,SEFD_error_budget=SEFD_error_budget):
         index = (A_gains == key)
         gainamp_mean[index] = 1.0
         gainamp_std[index] = SEFD_error_budget[key]
-    
+
     # take log
     loggainamp_mean = np.log(gainamp_mean)
     loggainamp_std = gainamp_std/gainamp_mean
@@ -188,3 +188,4 @@ def get_step_for_trace(trace=None, model=None, regularize=True, regular_window=5
     potential = pm.step_methods.hmc.quadpotential.QuadPotentialFull(cov)
 
     return pm.NUTS(potential=potential, **kwargs)
+

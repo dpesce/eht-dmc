@@ -428,7 +428,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
     # fit the model
 
     # NOTE: the current tuning scheme is rather arbitrary
-    # and could benefit from systematization
+    # and could likely benefit from systematization
 
     # set up tuning windows
     windows = n_start * (2**np.arange(np.floor(np.log2((n_tune - n_burn) / n_start))))
@@ -452,8 +452,9 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
 
     ###################################################
     # package the model info
-
-    modelinfo = {'trace': trace,
+    
+    modelinfo = {'modeltype': 'polimage',
+                 'trace': trace,
                  'tuning_traces': tuning_trace_list,
                  'nx': nx,
                  'ny': ny,

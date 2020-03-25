@@ -18,6 +18,8 @@ import ehtplot
 import corner
 import os
 
+import dmc as dm
+
 #######################################################
 # functions
 #######################################################
@@ -56,7 +58,7 @@ def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
         raise Exception('imtype ' + imtype + ' not recognized!')
     if moment not in ['mean','median','std','snr']:
         raise Exception('moment ' + moment + ' not recognized!')
-
+    
     ###################################################
     # organizing image information
 
@@ -141,7 +143,7 @@ def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
     return imageplot
 
 def plot_gains(modelinfo,gaintype,burnin=0):
-    """ Plot gain amplitudes or phrases over time for each station
+    """ Plot gain amplitudes or phases over time for each station
 
        Args:
            modelinfo (dict): dmc modelinfo dictionary
@@ -412,7 +414,7 @@ def plot_dterms(modelinfo,station,burnin=0,print_dterms=True,levels=None,smooth=
     ax.set_ylabel('Imaginary part')
 
     # axis ranges
-    limit = np.max(np.array([np.max(Dterm_reals_R[:,istat]),np.max(Dterm_imags_R[:,istat]),np.max(Dterm_reals_L[:,istat]),np.max(Dterm_imags_L[:,istat])]))
+    limit = np.max(np.array([np.max(np.abs(Dterm_reals_R[:,istat])),np.max(np.abs(Dterm_imags_R[:,istat])),np.max(np.abs(Dterm_reals_L[:,istat])),np.max(np.abs(Dterm_imags_L[:,istat]))]))
     ax.set_xlim(-1.1*limit,1.1*limit)
     ax.set_ylim(-1.1*limit,1.1*limit)
     for tick in ax.get_xticklabels():

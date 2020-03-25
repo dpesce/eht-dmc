@@ -36,21 +36,21 @@ obs = obs.flag_bl(['JC','SM'])
 # fit a polarized image model
 
 # number of pixels in each dimension
-nx = 6
-ny = 6
+nx = 12
+ny = 12
 
 # axis ranges in each dimension
-xmin = -20.0
-xmax = 20.0
-ymin = -20.0
-ymax = 20.0
+xmin = -30.0
+xmax = 30.0
+ymin = -30.0
+ymax = 30.0
+
+# estimate the total flux, in Jy
+total_flux_estimate = 0.4
 
 # set number of burn-in, tuning, and sampling steps
 ntuning = 2000
 ntrials = 10000
-
-# estimate the total flux, in Jy
-total_flux_estimate = 0.4
 
 # perform the model-fitting (note: takes a long time!)
 modelinfo = dm.models.polimage(obs,nx,ny,xmin,xmax,ymin,ymax,ntuning=ntuning,ntrials=ntrials,total_flux_estimate=total_flux_estimate,ref_station='AA')
@@ -99,3 +99,14 @@ for station in modelinfo['stations']:
     dtermplot = dm.plotting.plot_dterms(modelinfo,station)
     dtermplot.savefig('./dterms/dterms_'+station+'.png',dpi=300)
     plt.close(dtermplot)
+
+#######################################################
+# output some eht-imaging compatible files
+
+# save fits file of mean image
+dm.io.save_fits(modelinfo,'mean','image_mean.fits')
+
+
+
+
+
