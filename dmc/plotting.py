@@ -40,7 +40,7 @@ def plot_trace(modelinfo,**kwargs):
     return traceplot
 
 def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
-    """ Plot image pixel parameters
+    """ Plot image
 
        Args:
            modelinfo (dict): dmc modelinfo dictionary
@@ -58,7 +58,7 @@ def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
         raise Exception('imtype ' + imtype + ' not recognized!')
     if moment not in ['mean','median','std','snr']:
         raise Exception('moment ' + moment + ' not recognized!')
-    
+
     ###################################################
     # organizing image information
 
@@ -140,6 +140,107 @@ def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
     cax = imageplot.add_axes([axpos[0]+axpos[2]+0.03,axpos[1],0.03,axpos[3]])
     cbar = plt.colorbar(mappable=implot,cax=cax)
     
+    return imageplot
+
+def plot_polimage(modelinfo,moment,burnin=0,regrid=64,smooth=0.0,pcut=0.1,skip=4,Pmin=0.0,Pmax=0.3,cmap='gray_r',cmap2='rainbow'):
+    """ Plot polarized image with Stokes I and EVPA ticks
+        Adapted from script originally created by S. Issaoun
+
+       Args:
+           modelinfo (dict): dmc modelinfo dictionary
+           moment (str): the type of posterior moment to plot; choices are mean, median, std, snr
+           burnin (int): length of burn-in
+           regrid (int): number of pixels to regrid the image by; set to None for no regridding
+           smooth (float): FWHM of Gaussian smoothing kernel (uas)
+           pcut (float): polarization fraction plotting threshold
+           skip (int): tick plotting interval, in pixels
+           Pmin (float): minimum polarization fraction for colorbar
+           Pmax (float): maximum polarization fraction for colorbar
+           cmap (str): colormap for background Stokes I image
+           cmap2 (str): colormap for polarization ticks
+
+       Returns:
+           imageplot: figure containing the image plot
+
+    """
+
+    if moment not in ['mean','median','std','snr']:
+        raise Exception('moment ' + moment + ' not recognized!')
+
+    ###################################################
+    # organize polarization info
+
+    # create eht-imaging image object
+    im = dm.io.make_image(modelinfo,moment,burnin=burnin)
+
+    # regrid and smooth image
+    if regrid is not None:
+        im = im.regrid_image(im.psize*im.xdim, regrid, interp='linear')
+    if smooth > 0.0:
+        im = im.blur_circ(smooth*eh.RADPERUAS,smooth*eh.RADPERUAS)
+
+    # pixel size and FOV, in uas
+    pixel = im.psize/eh.RADPERUAS
+    FOV = pixel*im.xdim
+
+    # generate 2D grids for the x & y bounds
+    y, x = np.mgrid[slice(-FOV/2, FOV/2, pixel),
+                    slice(-FOV/2, FOV/2, pixel)]
+
+    Iarr = im.imvec.reshape(im.ydim, im.xdim)
+    Qarr = im.qvec.reshape(im.ydim, im.xdim)
+    Uarr = im.uvec.reshape(im.ydim, im.xdim)
+
+    # tick length proportional to P = sqrt(Q^2+U^2)
+    P = np.sqrt((im.qvec**2.0) + (im.uvec**2.0))
+    scale = np.max(P)    
+
+    # tick 'velocities'
+    vx = (-np.sin(np.angle(im.qvec+1j*im.uvec)/2)*P/scale).reshape(im.ydim, im.xdim)
+    vy = ( np.cos(np.angle(im.qvec+1j*im.uvec)/2)*P/scale).reshape(im.ydim, im.xdim)
+
+    # tick color will be proportional to polarization fraction
+    m = (P/im.imvec).reshape(im.xdim, im.ydim)
+
+    # mask arrays based on polarization fraction threshold criterion
+    m = np.ma.masked_where(Iarr < pcut * np.max(Iarr), m)
+    x_masked = np.ma.masked_where(Iarr < pcut * np.max(Iarr), x)
+    y_masked = np.ma.masked_where(Iarr < pcut * np.max(Iarr), y)
+    vx = np.ma.masked_where(Iarr < pcut * np.max(Iarr), vx)
+    vy = np.ma.masked_where(Iarr < pcut * np.max(Iarr), vy)
+
+    ###################################################
+    # create figure
+
+    imageplot = plt.figure(figsize=(6,5))
+    ax = imageplot.add_axes([0.1,0.1,0.75,0.75])
+
+    # plot background Stokes I image
+    ax.pcolormesh(-x,-y,Iarr,cmap=cmap,vmin=0,vmax=np.max(Iarr))
+
+    # set axis ranges and labels
+    ax.set_xlim(FOV/2,-FOV/2)
+    ax.set_ylim(-FOV/2,FOV/2)
+    ax.set_xlabel(r'RA ($\mu$as)')
+    ax.set_ylabel(r'Dec ($\mu$as)')
+    ax.set_aspect(1)
+
+    # plot ticks
+    qa = ax.quiver(-x_masked[::skip, ::skip],-y_masked[::skip, ::skip],vx[::skip, ::skip],vy[::skip, ::skip],
+               m[::skip,::skip],
+               headlength=0,
+               headwidth = 1,
+               pivot='mid',
+               width=0.01,
+               cmap=cmap2,
+               scale=16,
+               clim=(Pmin,Pmax))
+
+    # add colorbar
+    axpos = ax.get_position().bounds
+    cax = imageplot.add_axes([axpos[0]+axpos[2]+0.03,axpos[1],0.03,axpos[3]])
+    cbar = plt.colorbar(mappable=qa,cax=cax,label='Fractional Polarization')
+
     return imageplot
 
 def plot_gains(modelinfo,gaintype,burnin=0):

@@ -164,7 +164,7 @@ def save_fits(modelinfo,moment,outfile,burnin=0):
            None
 
     """
-
+    
     # create eht-imaging image object
     im = make_image(modelinfo,moment,burnin=burnin)
     

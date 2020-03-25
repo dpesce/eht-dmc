@@ -452,8 +452,9 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
 
     ###################################################
     # package the model info
-    
+
     modelinfo = {'modeltype': 'polimage',
+                 'model': model,
                  'trace': trace,
                  'tuning_traces': tuning_trace_list,
                  'nx': nx,
