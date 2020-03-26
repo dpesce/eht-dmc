@@ -75,7 +75,6 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
     u = obs.data['u']
     v = obs.data['v']
     rho = np.sqrt((u**2.0) + (v**2.0))
-    phi = np.arctan2(v,u)
 
     # get array of stations
     ant1 = obs.data['t1']
@@ -180,12 +179,6 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
             # smoothing width
             sigma = eh.RADPERUAS*pm.Uniform('sigma',lower=0.0,upper=20.0)
 
-            # asymmetry
-            A = pm.Uniform('A',lower=0.0,upper=1.0)
-
-            # orientation
-            psi = pm.VonMises('psi',mu=0.0,kappa=0.0001)
-
         ###############################################
         # set the priors for the gain parameters
 
@@ -206,8 +199,8 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
         # smooth with the Gaussian kernel
         
         if smooth:
-            Ireal_pregain_preshift = Ireal_pregain_preshift_presmooth*pm.math.exp(-((rho**2.0)/(2.0*(sigma**2.0)))*(1.0 - A*pm.math.cos(phi - psi)))
-            Iimag_pregain_preshift = Iimag_pregain_preshift_presmooth*pm.math.exp(-((rho**2.0)/(2.0*(sigma**2.0)))*(1.0 - A*pm.math.cos(phi - psi)))
+            Ireal_pregain_preshift = Ireal_pregain_preshift_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
+            Iimag_pregain_preshift = Iimag_pregain_preshift_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
         else:
             Ireal_pregain_preshift = Ireal_pregain_preshift_presmooth
             Iimag_pregain_preshift = Iimag_pregain_preshift_presmooth
@@ -845,6 +838,10 @@ def point(obs,total_flux_estimate=None,fit_total_flux=False,n_start=25,
             # fix at input value
             I = total_flux_estimate
 
+        # permit a centroid shift
+        x0 = eh.RADPERUAS*pm.Uniform('x0',lower=-100.0,upper=100.0)
+        y0 = eh.RADPERUAS*pm.Uniform('y0',lower=-100.0,upper=100.0)
+
         # set the prior on the systematic error term to be uniform on [0,1]
         f = pm.Uniform('f',lower=0.0,upper=1.0)
 
@@ -861,8 +858,15 @@ def point(obs,total_flux_estimate=None,fit_total_flux=False,n_start=25,
         ###############################################
         # perform the required Fourier transforms
         
-        Ireal_pregain = I
-        Iimag_pregain = 0.0
+        Ireal_pregain_preshift = I
+        Iimag_pregain_preshift = 0.0
+
+        ###############################################
+        # shift centroid
+        
+        shift_term = 2.0*np.pi*((u*x0) + (v*y0))
+        Ireal_pregain = (Ireal_pregain_preshift*pm.math.cos(shift_term)) + (Iimag_pregain_preshift*pm.math.sin(shift_term))
+        Iimag_pregain = (Iimag_pregain_preshift*pm.math.cos(shift_term)) - (Ireal_pregain_preshift*pm.math.sin(shift_term))
 
         ###############################################
         # compute the corruption terms
