@@ -271,21 +271,31 @@ def plot_gains(modelinfo,gaintype,burnin=0):
     trace = modelinfo['trace']
 
     # read gains
-    if gaintype == 'amp':
-        gain_R = trace['right_gain_amps'][burnin:]        
-        gain_L = trace['left_gain_amps'][burnin:]
-    if gaintype == 'phase':
-        gain_R = trace['right_gain_phases'][burnin:]
-        gain_L = trace['left_gain_phases'][burnin:]
+    if modelinfo['modeltype'] in ['polpoint','polimage']:
+        if gaintype == 'amp':
+            gain_R = trace['right_gain_amps'][burnin:]        
+            gain_L = trace['left_gain_amps'][burnin:]
+        if gaintype == 'phase':
+            gain_R = trace['right_gain_phases'][burnin:]
+            gain_L = trace['left_gain_phases'][burnin:]
+    else:
+        if gaintype == 'amp':
+            gain = trace['gain_amps'][burnin:]
+        if gaintype == 'phase':
+            gain = trace['gain_phases'][burnin:]
 
     # remove divergences
     div_mask = np.invert(trace[burnin:].diverging)
 
     # compute moments
-    std_R = np.std(gain_R[div_mask],axis=0)
-    med_R = np.median(gain_R[div_mask],axis=0)
-    std_L = np.std(gain_L[div_mask],axis=0)
-    med_L = np.median(gain_L[div_mask],axis=0)
+    if modelinfo['modeltype'] in ['polpoint','polimage']:
+        std_R = np.std(gain_R[div_mask],axis=0)
+        med_R = np.median(gain_R[div_mask],axis=0)
+        std_L = np.std(gain_L[div_mask],axis=0)
+        med_L = np.median(gain_L[div_mask],axis=0)
+    else:
+        med = np.median(gain[div_mask],axis=0)
+        std = np.std(gain[div_mask],axis=0)
 
     # additional gain info
     T_gains = modelinfo['T_gains']
@@ -314,8 +324,11 @@ def plot_gains(modelinfo,gaintype,burnin=0):
         index = (A_gains == ant)
 
         # plot gains
-        ax.plot(T_gains[index],med_R[index]+offset,linewidth=0,marker='o',markersize=3)
-        ax.plot(T_gains[index],med_L[index]+offset,linewidth=0,marker='s',markersize=3)
+        if modelinfo['modeltype'] in ['polpoint','polimage']:
+            ax.plot(T_gains[index],med_R[index]+offset,linewidth=0,marker='o',markersize=3)
+            ax.plot(T_gains[index],med_L[index]+offset,linewidth=0,marker='s',markersize=3)
+        else:
+            ax.plot(T_gains[index],med[index]+offset,linewidth=0,marker='o',markersize=3)
         
         if index.sum() > 0:
 
@@ -326,10 +339,14 @@ def plot_gains(modelinfo,gaintype,burnin=0):
                 ax.plot([-100.0,100.0],[offset,offset],'k--',linewidth=0.5,alpha=0.3,zorder=-11)
                 
             # increment vertical axis range
-            if np.max(med_R[index]+offset) > ymax:
-                ymax = np.max(med_R[index]+offset)
-            if np.max(med_L[index]+offset) > ymax:
-                ymax = np.max(med_L[index]+offset)
+            if modelinfo['modeltype'] in ['polpoint','polimage']:
+                if np.max(med_R[index]+offset) > ymax:
+                    ymax = np.max(med_R[index]+offset)
+                if np.max(med_L[index]+offset) > ymax:
+                    ymax = np.max(med_L[index]+offset)
+            else:
+                if np.max(med[index]+offset) > ymax:
+                    ymax = np.max(med[index]+offset)
 
             # track stations
             station_labels.append(ant)
@@ -401,17 +418,26 @@ def gain_cornerplots(modelinfo,gaintype,burnin=0,dirname=None,levels=None,smooth
     timestamps = np.sort(np.unique(T_gains))
 
     # read gains
-    if gaintype == 'amp':
-        gain_R = trace['right_gain_amps'][burnin:]        
-        gain_L = trace['left_gain_amps'][burnin:]
-    if gaintype == 'phase':
-        gain_R = trace['right_gain_phases'][burnin:]
-        gain_L = trace['left_gain_phases'][burnin:]
+    if modelinfo['modeltype'] in ['polpoint','polimage']:
+        if gaintype == 'amp':
+            gain_R = trace['right_gain_amps'][burnin:]        
+            gain_L = trace['left_gain_amps'][burnin:]
+        if gaintype == 'phase':
+            gain_R = trace['right_gain_phases'][burnin:]
+            gain_L = trace['left_gain_phases'][burnin:]
+    else:
+        if gaintype == 'amp':
+            gain = trace['gain_amps'][burnin:]
+        if gaintype == 'phase':
+            gain = trace['gain_phases'][burnin:]
 
     # remove divergences
     div_mask = np.invert(trace[burnin:].diverging)
-    gain_R = gain_R[div_mask]
-    gain_L = gain_L[div_mask]
+    if modelinfo['modeltype'] in ['polpoint','polimage']:
+        gain_R = gain_R[div_mask]
+        gain_L = gain_L[div_mask]
+    else:
+        gain = gain[div_mask]
 
     ###################################################
     # plot and save cornerplots
@@ -429,8 +455,11 @@ def gain_cornerplots(modelinfo,gaintype,burnin=0,dirname=None,levels=None,smooth
         ants_here = A_gains[ind_here]
 
         # initialize arrays of samples
-        samples_R = np.ndarray(shape=(len(gain_R[:,count]),len(ants_here)))
-        samples_L = np.ndarray(shape=(len(gain_L[:,count]),len(ants_here)))
+        if modelinfo['modeltype'] in ['polpoint','polimage']:
+            samples_R = np.ndarray(shape=(len(gain_R[:,count]),len(ants_here)))
+            samples_L = np.ndarray(shape=(len(gain_L[:,count]),len(ants_here)))
+        else:
+            samples = np.ndarray(shape=(len(gain[:,count]),len(ants_here)))
 
         # loop over all stations
         labels = list()
@@ -438,10 +467,13 @@ def gain_cornerplots(modelinfo,gaintype,burnin=0,dirname=None,levels=None,smooth
         for ia, ant in enumerate(ants_here):
 
             # extract the relevant chain samples
-            samples_R[:,ia] = gain_R[:,count]
-            samples_L[:,ia] = gain_L[:,count]
+            if modelinfo['modeltype'] in ['polpoint','polimage']:
+                samples_R[:,ia] = gain_R[:,count]
+                samples_L[:,ia] = gain_L[:,count]
+            else:
+                samples[:,ia] = gain[:,count]
 
-             # make plot labels + axis ranges
+            # make plot labels + axis ranges
             if gaintype == 'amp':
                 labels.append(r'$|G|_{\rm{'+ant+'}}$')
                 ranges.append((0.0,2.0))
@@ -452,11 +484,16 @@ def gain_cornerplots(modelinfo,gaintype,burnin=0,dirname=None,levels=None,smooth
             # increment counter
             count += 1
 
-        fig = corner.corner(samples_R,labels=labels,show_titles=False,title_fmt='.4f',levels=levels,
-                            title_kwargs={"fontsize": 12},smooth=smooth,smooth1d=smooth,plot_datapoints=False,
-                            plot_density=False,fill_contours=True,range=ranges,bins=100,color='cornflowerblue')
-        corner.corner(samples_L,fig=fig,smooth=smooth,smooth1d=smooth,plot_datapoints=False,levels=levels,
-                            plot_density=False,fill_contours=True,range=ranges,bins=100,color='salmon')
+        if modelinfo['modeltype'] in ['polpoint','polimage']:
+            fig = corner.corner(samples_R,labels=labels,show_titles=False,title_fmt='.4f',levels=levels,
+                                title_kwargs={"fontsize": 12},smooth=smooth,smooth1d=smooth,plot_datapoints=False,
+                                plot_density=False,fill_contours=True,range=ranges,bins=100,color='cornflowerblue')
+            corner.corner(samples_L,fig=fig,smooth=smooth,smooth1d=smooth,plot_datapoints=False,levels=levels,
+                                plot_density=False,fill_contours=True,range=ranges,bins=100,color='salmon')
+        else:
+            fig = corner.corner(samples,labels=labels,show_titles=False,title_fmt='.4f',levels=levels,
+                                title_kwargs={"fontsize": 12},smooth=smooth,smooth1d=smooth,plot_datapoints=False,
+                                plot_density=False,fill_contours=True,range=ranges,bins=100,color='cornflowerblue')
         fig.savefig(dirname+'/gains_scan'+str(it).zfill(5)+'.png',dpi=300)
         plt.close()
 
