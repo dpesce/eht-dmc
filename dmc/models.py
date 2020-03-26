@@ -27,8 +27,8 @@ EARLY_MAX_TREEDEPTH = 10
 #######################################################
 
 def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
-          fit_total_flux=False,n_start=25,n_burn=500,n_tune=5000,
-          ntuning=2000,ntrials=10000,**kwargs):
+          fit_total_flux=False,allow_offset=False,offset_window=200.0,smooth=False,
+          n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,**kwargs):
     """ Fit a Stokes I image to a VLBI observation
 
        Args:
@@ -41,8 +41,11 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
            ymax(float): maximum x pixel value (uas)
            
            total_flux_estimate (float): estimate of total Stokes I image flux (Jy)
-                      
+           offset_window (float): width of square offset window (uas)
+
            fit_total_flux (bool): flag to fit for the total flux
+           allow_offset (bool): flag to permit image centroid to be a free parameter
+           smooth (bool): flag to fit for a Gaussian smoothing kernel
             
            n_start (int): initial number of default tuning steps
            n_burn (int): number of burn-in steps
@@ -72,6 +75,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
     u = obs.data['u']
     v = obs.data['v']
     rho = np.sqrt((u**2.0) + (v**2.0))
+    phi = np.arctan2(v,u)
 
     # get array of stations
     ant1 = obs.data['t1']
@@ -163,6 +167,25 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
         # set the prior on the systematic error term to be uniform on [0,1]
         f = pm.Uniform('f',lower=0.0,upper=1.0)
 
+        # permit a centroid shift in the image
+        if allow_offset:
+            x0 = eh.RADPERUAS*pm.Uniform('x0',lower=-(offset_window/2.0),upper=(offset_window/2.0))
+            y0 = eh.RADPERUAS*pm.Uniform('y0',lower=-(offset_window/2.0),upper=(offset_window/2.0))
+        else:
+            x0 = 0.0
+            y0 = 0.0
+
+        # Gaussian smoothing kernel parameters
+        if smooth:
+            # smoothing width
+            sigma = eh.RADPERUAS*pm.Uniform('sigma',lower=0.0,upper=20.0)
+
+            # asymmetry
+            A = pm.Uniform('A',lower=0.0,upper=1.0)
+
+            # orientation
+            psi = pm.VonMises('psi',mu=0.0,kappa=0.0001)
+
         ###############################################
         # set the priors for the gain parameters
 
@@ -176,8 +199,25 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
         ###############################################
         # perform the required Fourier transforms
         
-        Ireal_pregain = pm.math.dot(A_real,I)
-        Iimag_pregain = pm.math.dot(A_imag,I)
+        Ireal_pregain_preshift_presmooth = pm.math.dot(A_real,I)
+        Iimag_pregain_preshift_presmooth = pm.math.dot(A_imag,I)
+
+        ###############################################
+        # smooth with the Gaussian kernel
+        
+        if smooth:
+            Ireal_pregain_preshift = Ireal_pregain_preshift_presmooth*pm.math.exp(-((rho**2.0)/(2.0*(sigma**2.0)))*(1.0 - A*pm.math.cos(phi - psi)))
+            Iimag_pregain_preshift = Iimag_pregain_preshift_presmooth*pm.math.exp(-((rho**2.0)/(2.0*(sigma**2.0)))*(1.0 - A*pm.math.cos(phi - psi)))
+        else:
+            Ireal_pregain_preshift = Ireal_pregain_preshift_presmooth
+            Iimag_pregain_preshift = Iimag_pregain_preshift_presmooth
+
+        ###############################################
+        # shift centroid
+
+        shift_term = 2.0*np.pi*((u*x0) + (v*y0))
+        Ireal_pregain = (Ireal_pregain_preshift*pm.math.cos(shift_term)) + (Iimag_pregain_preshift*pm.math.sin(shift_term))
+        Iimag_pregain = (Iimag_pregain_preshift*pm.math.cos(shift_term)) - (Ireal_pregain_preshift*pm.math.sin(shift_term))
 
         ###############################################
         # compute the corruption terms
@@ -251,6 +291,9 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
                  'ymin': ymin,
                  'ymax': ymax,
                  'fit_total_flux': fit_total_flux,
+                 'allow_offset': allow_offset,
+                 'offset_window': offset_window,
+                 'smooth': smooth,
                  'total_flux_estimate': total_flux_estimate,
                  'ntuning': ntuning,
                  'ntrials': ntrials,

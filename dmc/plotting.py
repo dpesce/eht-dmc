@@ -674,3 +674,85 @@ def plot_stepsize(modelinfo,burnin=0):
     ax.set_xlabel('Trial number')
 
     return stepplot
+
+def plot_polimtot(modelinfo,outname,burnin=0,levels=None):
+    """ Make a cornerplot of image-integrated quantities
+
+       Args:
+           modelinfo (dict): dmc modelinfo dictionary
+           outname (str): name of the output file
+           burnin (int): length of burn-in
+           levels (list): a list of contour levels to plot
+           
+       Returns:
+           None
+
+    """
+
+    if modelinfo['modeltype'] not in ['polimage']:
+        raise Exception('modeltype is not polimage!')
+
+    # contour levels
+    if levels is None:
+        levels = [1.0-np.exp(-0.5*(1.1775**2.0)),1.0-np.exp(-0.5*(2.146**2.0)),1.0-np.exp(-0.5*(3.035**2.0))]
+
+    ###################################################
+    # organize chain info
+
+    trace = modelinfo['trace']
+
+    # remove burnin
+    Ivec = trace['I'][burnin:]
+    Qvec = trace['Q'][burnin:]
+    Uvec = trace['U'][burnin:]
+    Vvec = trace['V'][burnin:]
+
+    # remove divergences
+    div_mask = np.invert(trace[burnin:].diverging)
+    Ivec = Ivec[div_mask]
+    Qvec = Qvec[div_mask]
+    Uvec = Uvec[div_mask]
+    Vvec = Vvec[div_mask]
+
+    ###################################################
+    # construct image-integrated quantities
+
+    # initialize arrays
+    pvec = np.zeros(len(Ivec))
+    EVPAvec = np.zeros(len(Ivec))
+    vvec = np.zeros(len(Ivec))
+
+    # loop over elements in chain
+    for i in range(len(Ivec)):
+        I_here = Ivec[i]
+        Q_here = Qvec[i]
+        U_here = Uvec[i]
+        V_here = Vvec[i]
+
+        # linear polarization fractio
+        p_here = (np.sum(Q_here) + ((1j)*np.sum(U_here))) / np.sum(I_here)
+        pvec[i] = np.abs(p_here)
+
+        # EVPA
+        EVPAvec[i] = (180.0/np.pi)*0.5*np.angle(p_here)
+
+        # circular polarization fraction
+        v_here = np.sum(V_here) / np.sum(I_here)
+        vvec[i] = v_here
+
+    ###################################################
+    # make cornerplot
+
+    samples = np.ndarray(shape=(len(pvec),3))
+    samples[:,0] = np.copy(pvec)
+    samples[:,1] = np.copy(EVPAvec)
+    samples[:,2] = np.copy(vvec)
+
+    labels = [r'$p$',r'$\chi$',r'$v$']
+
+    fig = corner.corner(samples,labels=labels,levels=levels,show_titles=True,title_fmt='.4f',
+                title_kwargs={"fontsize": 12},smooth=1.0,smooth1d=1.0,plot_datapoints=False,
+                plot_density=False,fill_contours=True,bins=30,color='black')
+    fig.axes[7].set_xlabel(r'$\chi$ (deg.)')
+    fig.savefig(outname,dpi=300)
+    plt.close()
