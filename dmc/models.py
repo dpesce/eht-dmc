@@ -250,6 +250,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
                  'xmax': xmax,
                  'ymin': ymin,
                  'ymax': ymax,
+                 'fit_total_flux': fit_total_flux,
                  'total_flux_estimate': total_flux_estimate,
                  'ntuning': ntuning,
                  'ntrials': ntrials,
@@ -695,6 +696,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
                  'xmax': xmax,
                  'ymin': ymin,
                  'ymax': ymax,
+                 'fit_total_flux': fit_total_flux,
                  'total_flux_estimate': total_flux_estimate,
                  'ntuning': ntuning,
                  'ntrials': ntrials,
@@ -774,7 +776,7 @@ def point(obs,total_flux_estimate=None,fit_total_flux=False,n_start=25,
 
     # prior info for log gain amplitudes
     loggainamp_mean, loggainamp_std = mu.gain_logamp_prior(obs)
-    
+
     # prior info for gain phases
     gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,ref_station=ref_station)
 
@@ -800,15 +802,12 @@ def point(obs,total_flux_estimate=None,fit_total_flux=False,n_start=25,
             # fix at input value
             I = total_flux_estimate
 
-            # hack to keep track of I
-            Iout = pm.Deterministic('I',pm.math.sqrt(I**2.0))
-
         # set the prior on the systematic error term to be uniform on [0,1]
         f = pm.Uniform('f',lower=0.0,upper=1.0)
 
         ###############################################
         # set the priors for the gain parameters
-        
+
         # set the gain amplitude priors to be log-normal around the specified inputs
         logg = pm.Normal('logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
         g = pm.Deterministic('gain_amps',pm.math.exp(logg))
@@ -887,6 +886,7 @@ def point(obs,total_flux_estimate=None,fit_total_flux=False,n_start=25,
                  'model': model,
                  'trace': trace,
                  'tuning_traces': tuning_trace_list,
+                 'fit_total_flux': fit_total_flux,
                  'total_flux_estimate': total_flux_estimate,
                  'ntuning': ntuning,
                  'ntrials': ntrials,
@@ -1019,9 +1019,6 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,
         else:
             # fix at input value
             I = total_flux_estimate
-
-            # hack to keep track of I
-            Iout = pm.Deterministic('I',pm.math.sqrt(I**2.0))
         
         # sample the polarization fraction uniformly on [0,1]
         p = pm.Uniform('p',lower=0.0,upper=1.0)
@@ -1295,6 +1292,7 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,
                  'model': model,
                  'trace': trace,
                  'tuning_traces': tuning_trace_list,
+                 'fit_total_flux': fit_total_flux,
                  'total_flux_estimate': total_flux_estimate,
                  'ntuning': ntuning,
                  'ntrials': ntrials,

@@ -50,7 +50,7 @@ dm.io.save_model(modelinfo,'modelinfo.p')
 # make some summary plots
 
 # trace plots
-dm.plotting.plot_trace(modelinfo,var_names=['f','I','gain_amps','gain_phases'])
+dm.plotting.plot_trace(modelinfo,var_names=['f','gain_amps','gain_phases'])
 plt.savefig('traceplots.png',dpi=300)
 plt.close()
 
