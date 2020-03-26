@@ -808,7 +808,7 @@ def point(obs,total_flux_estimate=None,fit_total_flux=False,n_start=25,
 
         ###############################################
         # set the priors for the gain parameters
-
+        
         # set the gain amplitude priors to be log-normal around the specified inputs
         logg = pm.Normal('logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
         g = pm.Deterministic('gain_amps',pm.math.exp(logg))
@@ -840,8 +840,8 @@ def point(obs,total_flux_estimate=None,fit_total_flux=False,n_start=25,
         ###############################################
         # add in the systematic noise component
 
-        Ireal_err_model = pm.math.sqrt((I_real_err**2.0) + (f*F)**2.0)
-        Iimag_err_model = pm.math.sqrt((I_imag_err**2.0) + (f*F)**2.0)
+        Ireal_err_model = pm.math.sqrt((I_real_err**2.0) + (f*I)**2.0)
+        Iimag_err_model = pm.math.sqrt((I_imag_err**2.0) + (f*I)**2.0)
 
         ###############################################
         # define the likelihood
