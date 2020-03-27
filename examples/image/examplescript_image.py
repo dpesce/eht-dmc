@@ -49,7 +49,7 @@ ntuning = 2000
 ntrials = 10000
 
 # perform the model-fitting (note: takes a long time!)
-modelinfo = dm.models.image(obs,nx,ny,xmin,xmax,ymin,ymax,ntuning=ntuning,ntrials=ntrials,total_flux_estimate=1.0)
+modelinfo = dm.models.image(obs,nx,ny,xmin,xmax,ymin,ymax,ntuning=ntuning,ntrials=ntrials,total_flux_estimate=1.0,smooth=True)
 
 # save the model file
 dm.io.save_model(modelinfo,'modelinfo.p')
@@ -58,7 +58,7 @@ dm.io.save_model(modelinfo,'modelinfo.p')
 # make some summary plots
 
 # trace plots
-dm.plotting.plot_trace(modelinfo,var_names=['f','I','gain_amps','gain_phases'])
+dm.plotting.plot_trace(modelinfo,var_names=['f','I','sigma','gain_amps','gain_phases'])
 plt.savefig('traceplots.png',dpi=300)
 plt.close()
 

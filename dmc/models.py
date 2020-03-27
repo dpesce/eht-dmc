@@ -954,9 +954,9 @@ def point(obs,total_flux_estimate=None,fit_total_flux=True,
 
     return modelinfo
 
-def polpoint(obs,total_flux_estimate=None,RLequal=False,
-          fit_StokesV=True,fit_total_flux=False,n_start=25,n_burn=500,n_tune=5000,
-          ntuning=2000,ntrials=10000,**kwargs):
+def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
+             fit_total_flux=False,allow_offset=False,offset_window=200.0,
+             n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,**kwargs):
     """ Fit a polarized point source model to a VLBI observation
 
        Args:
@@ -966,6 +966,8 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,
            RLequal (bool): flag to fix right and left gain terms to be equal
            fit_StokesV (bool): flag to fit for Stokes V; set to False to fix V = 0
            fit_total_flux (bool): flag to fit for the total flux
+           allow_offset (bool): flag to permit image centroid to be a free parameter
+           offset_window (float): width of square offset window (uas)
             
            n_start (int): initial number of default tuning steps
            n_burn (int): number of burn-in steps
@@ -1092,6 +1094,14 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,
             cosbeta = 0.0
         sinbeta = pm.math.sqrt(1.0 - (cosbeta**2.0))
 
+        # permit a centroid shift
+        if allow_offset:
+            x0 = eh.RADPERUAS*pm.Uniform('x0',lower=-(offset_window/2.0),upper=(offset_window/2.0))
+            y0 = eh.RADPERUAS*pm.Uniform('y0',lower=-(offset_window/2.0),upper=(offset_window/2.0))
+        else:
+            x0 = 0.0
+            y0 = 0.0
+
         # set the prior on the systematic error term to be uniform on [0,1]
         f = pm.Uniform('f',lower=0.0,upper=1.0)
 
@@ -1147,18 +1157,35 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,
         ###############################################
         # perform the required Fourier transforms
         
-        Ireal = I
-        Iimag = 0.0
+        Ireal_preshift = I
+        Iimag_preshift = 0.0
         
-        Qreal = Q
-        Qimag = 0.0
+        Qreal_preshift = Q
+        Qimag_preshift = 0.0
         
-        Ureal = U
-        Uimag = 0.0
+        Ureal_preshift = U
+        Uimag_preshift = 0.0
         
-        Vreal = V
-        Vimag = 0.0
+        Vreal_preshift = V
+        Vimag_preshift = 0.0
 
+        ###############################################
+        # shift centroid
+        
+        shift_term = 2.0*np.pi*((u*x0) + (v*y0))
+        
+        Ireal = (Ireal_preshift*pm.math.cos(shift_term)) + (Iimag_preshift*pm.math.sin(shift_term))
+        Iimag = (Iimag_preshift*pm.math.cos(shift_term)) - (Ireal_preshift*pm.math.sin(shift_term))
+        
+        Qreal = (Qreal_preshift*pm.math.cos(shift_term)) + (Qimag_preshift*pm.math.sin(shift_term))
+        Qimag = (Qimag_preshift*pm.math.cos(shift_term)) - (Qreal_preshift*pm.math.sin(shift_term))
+        
+        Ureal = (Ureal_preshift*pm.math.cos(shift_term)) + (Uimag_preshift*pm.math.sin(shift_term))
+        Uimag = (Uimag_preshift*pm.math.cos(shift_term)) - (Ureal_preshift*pm.math.sin(shift_term))
+        
+        Vreal = (Vreal_preshift*pm.math.cos(shift_term)) + (Vimag_preshift*pm.math.sin(shift_term))
+        Vimag = (Vimag_preshift*pm.math.cos(shift_term)) - (Vreal_preshift*pm.math.sin(shift_term))
+        
         ###############################################
         # construct the pre-corrupted circular basis model visibilities
 
@@ -1350,6 +1377,8 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,
                  'tuning_traces': tuning_trace_list,
                  'fit_total_flux': fit_total_flux,
                  'total_flux_estimate': total_flux_estimate,
+                 'allow_offset': allow_offset,
+                 'offset_window': offset_window,
                  'ntuning': ntuning,
                  'ntrials': ntrials,
                  'RLequal': RLequal,
