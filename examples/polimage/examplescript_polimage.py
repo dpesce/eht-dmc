@@ -105,6 +105,9 @@ for station in modelinfo['stations']:
     dtermplot.savefig('./dterms/dterms_'+station+'.png',dpi=300)
     plt.close(dtermplot)
 
+# image-integrated quantity plot
+dm.plotting.plot_polimtot(modelinfo,'image_integrated.png')
+
 #######################################################
 # output some eht-imaging compatible files
 
