@@ -6,7 +6,7 @@ def read(fname):
 
 if __name__ == "__main__":
     setup(name="eht-dmc",
-          version = "0.1dev",
+          version = "0.2dev",
           author = "Dom Pesce",
           author_email = "dpesce@cfa.harvard.edu",
           description = ("Python code to perform radio interferometric imaging and "+
