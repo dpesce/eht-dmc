@@ -746,7 +746,8 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
 
     return modelinfo
 
-def point(obs,total_flux_estimate=None,fit_total_flux=False,n_start=25,
+def point(obs,total_flux_estimate=None,fit_total_flux=True,
+          allow_offset=False,offset_window=200.0,n_start=25,
           n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,**kwargs):
     """ Fit a point source model to a VLBI observation
 
@@ -755,6 +756,8 @@ def point(obs,total_flux_estimate=None,fit_total_flux=False,n_start=25,
            total_flux_estimate (float): estimate of total Stokes I flux (Jy)
            
            fit_total_flux (bool): flag to fit for the total flux
+           allow_offset (bool): flag to permit image centroid to be a free parameter
+           offset_window (float): width of square offset window (uas)
             
            n_start (int): initial number of default tuning steps
            n_burn (int): number of burn-in steps
@@ -839,8 +842,12 @@ def point(obs,total_flux_estimate=None,fit_total_flux=False,n_start=25,
             I = total_flux_estimate
 
         # permit a centroid shift
-        x0 = eh.RADPERUAS*pm.Uniform('x0',lower=-100.0,upper=100.0)
-        y0 = eh.RADPERUAS*pm.Uniform('y0',lower=-100.0,upper=100.0)
+        if allow_offset:
+            x0 = eh.RADPERUAS*pm.Uniform('x0',lower=-(offset_window/2.0),upper=(offset_window/2.0))
+            y0 = eh.RADPERUAS*pm.Uniform('y0',lower=-(offset_window/2.0),upper=(offset_window/2.0))
+        else:
+            x0 = 0.0
+            y0 = 0.0
 
         # set the prior on the systematic error term to be uniform on [0,1]
         f = pm.Uniform('f',lower=0.0,upper=1.0)
@@ -863,7 +870,7 @@ def point(obs,total_flux_estimate=None,fit_total_flux=False,n_start=25,
 
         ###############################################
         # shift centroid
-        
+
         shift_term = 2.0*np.pi*((u*x0) + (v*y0))
         Ireal_pregain = (Ireal_pregain_preshift*pm.math.cos(shift_term)) + (Iimag_pregain_preshift*pm.math.sin(shift_term))
         Iimag_pregain = (Iimag_pregain_preshift*pm.math.cos(shift_term)) - (Ireal_pregain_preshift*pm.math.sin(shift_term))
@@ -935,6 +942,8 @@ def point(obs,total_flux_estimate=None,fit_total_flux=False,n_start=25,
                  'tuning_traces': tuning_trace_list,
                  'fit_total_flux': fit_total_flux,
                  'total_flux_estimate': total_flux_estimate,
+                 'allow_offset': allow_offset,
+                 'offset_window': offset_window,
                  'ntuning': ntuning,
                  'ntrials': ntrials,
                  'obs': obs,

@@ -26,17 +26,13 @@ obs.add_scans()
 obs = obs.avg_coherent(0.0,scan_avg=True)
 
 # flag nonzero baselines
-# retain only AA-AP and JC-SM
-obs = obs.flag_sites(['LM','AZ','PV','SP'])
-obs = obs.flag_bl(['AA','SM'])
-obs = obs.flag_bl(['AP','SM'])
-obs = obs.flag_bl(['AA','JC'])
-obs = obs.flag_bl(['AP','JC'])
+# retain only AA-AP
+obs = obs.flag_sites(['LM','AZ','PV','SP','JC','SM'])
 
 #######################################################
 # fit a point source model
 
-# set number of burn-in, tuning, and sampling steps
+# set number of tuning and sampling steps
 ntuning = 2000
 ntrials = 10000
 
@@ -50,7 +46,7 @@ dm.io.save_model(modelinfo,'modelinfo.p')
 # make some summary plots
 
 # trace plots
-dm.plotting.plot_trace(modelinfo,var_names=['f','gain_amps','gain_phases'])
+dm.plotting.plot_trace(modelinfo,var_names=['f','I','gain_amps','gain_phases'])
 plt.savefig('traceplots.png',dpi=300)
 plt.close()
 
