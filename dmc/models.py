@@ -577,8 +577,8 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
         
         Dphase_R1 = Dphase_R1_preFR + FR1
         Dphase_R2 = Dphase_R2_preFR + FR2
-        Dphase_L1 = Dphase_L1_preFR + FR1
-        Dphase_L2 = Dphase_L2_preFR + FR2
+        Dphase_L1 = Dphase_L1_preFR - FR1
+        Dphase_L2 = Dphase_L2_preFR - FR2
         
         ###############################################
         # apply corruptions to the model visibilities
@@ -1020,16 +1020,9 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
     LR_imag_err = obs.data['lrsigma']
 
     # construct masks to remove missing data
-    mask = ~np.isfinite(obs.data['rrvis'])
     mask_RR = np.where(np.isfinite(obs.data['rrvis']))
-
-    mask = ~np.isfinite(obs.data['llvis'])
     mask_LL = np.where(np.isfinite(obs.data['llvis']))
-
-    mask = ~np.isfinite(obs.data['rlvis'])
     mask_RL = np.where(np.isfinite(obs.data['rlvis']))
-
-    mask = ~np.isfinite(obs.data['lrvis'])
     mask_LR = np.where(np.isfinite(obs.data['lrvis']))
 
     # construct design matrices for gain terms
@@ -1226,8 +1219,8 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
         
         Dphase_R1 = Dphase_R1_preFR + FR1
         Dphase_R2 = Dphase_R2_preFR + FR2
-        Dphase_L1 = Dphase_L1_preFR + FR1
-        Dphase_L2 = Dphase_L2_preFR + FR2
+        Dphase_L1 = Dphase_L1_preFR - FR1
+        Dphase_L2 = Dphase_L2_preFR - FR2
         
         ###############################################
         # apply corruptions to the model visibilities
