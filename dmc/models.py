@@ -26,7 +26,7 @@ EARLY_MAX_TREEDEPTH = 10
 # functions
 #######################################################
 
-def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
+def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,loose_change=False,
           fit_total_flux=False,allow_offset=False,offset_window=200.0,smooth=False,
           n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,**kwargs):
     """ Fit a Stokes I image to a VLBI observation
@@ -42,7 +42,8 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
            
            total_flux_estimate (float): estimate of total Stokes I image flux (Jy)
            offset_window (float): width of square offset window (uas)
-
+    
+           loose_change (bool): flag to use the "loose change" noise prescription
            fit_total_flux (bool): flag to fit for the total flux
            allow_offset (bool): flag to permit image centroid to be a free parameter
            smooth (bool): flag to fit for a Gaussian smoothing kernel
@@ -132,7 +133,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
     
     # prior info for gain phases
     gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,ref_station=ref_station)
-
+    
     # specify the Dirichlet weights; 1 = flat; <1 = sparse; >1 = smooth
     dirichlet_weights = 1.0*np.ones_like(x)
 
@@ -163,8 +164,16 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
         pix = pm.Dirichlet('pix',dirichlet_weights)
         I = pm.Deterministic('I',pix*F)
 
-        # set the prior on the systematic error term to be uniform on [0,1]
-        f = pm.Uniform('f',lower=0.0,upper=1.0)
+        # systematic noise prescription
+        if loose_change:
+            # set the prior on the multiplicative systematic error term to be uniform on [0,1]
+            multiplicative = pm.Uniform('multiplicative',lower=0.0,upper=1.0)
+
+            # set the prior on the additive systematic error term to be uniform on [0,100] mJy
+            additive = 0.1*pm.Uniform('additive',lower=0.0,upper=0.1)
+        else:
+            # set the prior on the systematic error term to be uniform on [0,1]
+            f = pm.Uniform('f',lower=0.0,upper=1.0)
 
         # permit a centroid shift in the image
         if allow_offset:
@@ -230,8 +239,13 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
         ###############################################
         # add in the systematic noise component
 
-        Ireal_err_model = pm.math.sqrt((I_real_err**2.0) + (f*F)**2.0)
-        Iimag_err_model = pm.math.sqrt((I_imag_err**2.0) + (f*F)**2.0)
+        if loose_change:
+            Itot_model = pm.math.sqrt((Ireal_model**2.0) + (Iimag_model**2.0))
+            Ireal_err_model = pm.math.sqrt((I_real_err**2.0) + ((multiplicative*Itot_model)**2.0) + (additive**2.0))
+            Iimag_err_model = pm.math.sqrt((I_imag_err**2.0) + ((multiplicative*Itot_model)**2.0) + (additive**2.0))
+        else:
+            Ireal_err_model = pm.math.sqrt((I_real_err**2.0) + (f*F)**2.0)
+            Iimag_err_model = pm.math.sqrt((I_imag_err**2.0) + (f*F)**2.0)
 
         ###############################################
         # define the likelihood
@@ -283,6 +297,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,
                  'xmax': xmax,
                  'ymin': ymin,
                  'ymax': ymax,
+                 'loose_change': loose_change,
                  'fit_total_flux': fit_total_flux,
                  'allow_offset': allow_offset,
                  'offset_window': offset_window,
