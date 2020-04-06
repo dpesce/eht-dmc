@@ -184,10 +184,7 @@ def FRvec(obs,ehtim_convention=True):
     # combine to get field rotations for each station
     FR1 = (f_el1*el1) + (f_par1*par1) + f_off1
     FR2 = (f_el2*el2) + (f_par2*par2) + f_off2
-
-    # negate the second station to account for conjugation
-    FR2 *= -1.0
-
+    
     # if pre-rotation has been applied, multiply by 2.0
     if ehtim_convention:
         FR1 *= 2.0

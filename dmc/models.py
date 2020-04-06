@@ -383,10 +383,33 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
     LR_real_err = obs.data['lrsigma']
     LR_imag_err = obs.data['lrsigma']
 
-    # construct masks to remove missing data
+    # mask out any blank data by giving it enormous uncertainties
+    mask = ~np.isfinite(obs.data['rrvis'])
+    RR_real[mask] = 0.0
+    RR_imag[mask] = 0.0
+    RR_real_err[mask] = 1000.0
+    RR_imag_err[mask] = 1000.0
     mask_RR = np.where(np.isfinite(obs.data['rrvis']))
+
+    mask = ~np.isfinite(obs.data['llvis'])
+    LL_real[mask] = 0.0
+    LL_imag[mask] = 0.0
+    LL_real_err[mask] = 1000.0
+    LL_imag_err[mask] = 1000.0
     mask_LL = np.where(np.isfinite(obs.data['llvis']))
+
+    mask = ~np.isfinite(obs.data['rlvis'])
+    RL_real[mask] = 0.0
+    RL_imag[mask] = 0.0
+    RL_real_err[mask] = 1000.0
+    RL_imag_err[mask] = 1000.0
     mask_RL = np.where(np.isfinite(obs.data['rlvis']))
+
+    mask = ~np.isfinite(obs.data['lrvis'])
+    LR_real[mask] = 0.0
+    LR_imag[mask] = 0.0
+    LR_real_err[mask] = 1000.0
+    LR_imag_err[mask] = 1000.0
     mask_LR = np.where(np.isfinite(obs.data['lrvis']))
 
     # construct design matrices for gain terms
@@ -434,7 +457,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
 
     # prior info for log gain amplitudes
     loggainamp_mean, loggainamp_std = mu.gain_logamp_prior(obs)
-    
+
     # prior info for gain phases
     gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,ref_station=ref_station)
 
@@ -1034,10 +1057,33 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
     LR_real_err = obs.data['lrsigma']
     LR_imag_err = obs.data['lrsigma']
 
-    # construct masks to remove missing data
+    # mask out any blank data by giving it enormous uncertainties
+    mask = ~np.isfinite(obs.data['rrvis'])
+    RR_real[mask] = 0.0
+    RR_imag[mask] = 0.0
+    RR_real_err[mask] = 1000.0
+    RR_imag_err[mask] = 1000.0
     mask_RR = np.where(np.isfinite(obs.data['rrvis']))
+
+    mask = ~np.isfinite(obs.data['llvis'])
+    LL_real[mask] = 0.0
+    LL_imag[mask] = 0.0
+    LL_real_err[mask] = 1000.0
+    LL_imag_err[mask] = 1000.0
     mask_LL = np.where(np.isfinite(obs.data['llvis']))
+
+    mask = ~np.isfinite(obs.data['rlvis'])
+    RL_real[mask] = 0.0
+    RL_imag[mask] = 0.0
+    RL_real_err[mask] = 1000.0
+    RL_imag_err[mask] = 1000.0
     mask_RL = np.where(np.isfinite(obs.data['rlvis']))
+
+    mask = ~np.isfinite(obs.data['lrvis'])
+    LR_real[mask] = 0.0
+    LR_imag[mask] = 0.0
+    LR_real_err[mask] = 1000.0
+    LR_imag_err[mask] = 1000.0
     mask_LR = np.where(np.isfinite(obs.data['lrvis']))
 
     # construct design matrices for gain terms
