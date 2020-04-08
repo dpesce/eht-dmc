@@ -4,13 +4,7 @@ A radio interferometric modeling tool developed for the Event Horizon Telescope 
 NOTE: Currently still in testing mode, so no guarantees that code will work at all yet.
 
 ### Installation instructions
-To install the stable version, use `pip`:
-
-```
-pip install eht-dmc
-```
-
-To install the most recent development version, clone the repository, move into the main directory, and install using `pip`:
+To install the most recent version, clone the repository, move into the main directory, and install using `pip`:
 
 ```
 git clone https://github.com/dpesce/DMC.git
