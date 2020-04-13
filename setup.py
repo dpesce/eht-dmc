@@ -17,12 +17,12 @@ if __name__ == "__main__":
           url = "https://github.com/dpesce/eht-dmc",
           packages = ["eht_dmc"],
           long_description=read('README.md'),
-          install_requires=["ehtim",
+          install_requires=["ehtim",  # https://github.com/achael/eht-imaging.git
                             "pymc3",
                             "future",
                             "matplotlib",
                             "numpy",
                             "scipy",
                             "corner",
-                            "ehtplot"]
+                            "ehtplot"]  # git+https://github.com/liamedeiros/ehtplot.git
     )
