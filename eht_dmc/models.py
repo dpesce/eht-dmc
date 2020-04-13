@@ -4,16 +4,13 @@
 
 from __future__ import division
 from __future__ import print_function
-from builtins import list
-from builtins import len
-from builtins import range
-from builtins import enumerate
 
 import numpy as np
 import ehtim as eh
 import pymc3 as pm
-import dmc.data_utils as du
-import dmc.model_utils as mu
+
+from . import data_utils as du
+from . import model_utils as mu
 
 #######################################################
 # constants

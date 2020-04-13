@@ -4,11 +4,6 @@
 
 from __future__ import division
 from __future__ import print_function
-from builtins import list
-from builtins import len
-from builtins import range
-from builtins import enumerate
-from builtins import Exception
 
 import numpy as np
 import ehtim as eh

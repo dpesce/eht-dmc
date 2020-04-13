@@ -4,11 +4,6 @@
 
 from __future__ import division
 from __future__ import print_function
-from builtins import list
-from builtins import len
-from builtins import range
-from builtins import enumerate
-from builtins import Exception
 
 import numpy as np
 import ehtim as eh
@@ -18,7 +13,7 @@ import ehtplot
 import corner
 import os
 
-import dmc as dm
+from . import model_utils as mu
 
 #######################################################
 # functions
@@ -177,7 +172,7 @@ def plot_polimage(modelinfo,moment,burnin=0,regrid=64,smooth=0.0,pcut=0.1,skip=4
     # organize polarization info
 
     # create eht-imaging image object
-    im = dm.io.make_image(modelinfo,moment,burnin=burnin)
+    im = mu.make_image(modelinfo,moment,burnin=burnin)
 
     # regrid and smooth image
     if regrid is not None:

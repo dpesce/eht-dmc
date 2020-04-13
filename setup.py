@@ -6,7 +6,7 @@ def read(fname):
 
 if __name__ == "__main__":
     setup(name="eht-dmc",
-          version = "0.2dev",
+          version = "0.1dev",
           author = "Dom Pesce",
           author_email = "dpesce@cfa.harvard.edu",
           description = ("Python code to perform radio interferometric imaging and "+
@@ -14,8 +14,8 @@ if __name__ == "__main__":
                          "total intensity and polarization."),
           license = "GPLv3",
           keywords = "radio interferometry VLBI",
-          url = "https://github.com/dpesce/DMC",
-          packages = ["dmc"],
+          url = "https://github.com/dpesce/eht-dmc",
+          packages = ["eht_dmc"],
           long_description=read('README.md'),
           install_requires=["ehtim",
                             "pymc3",
