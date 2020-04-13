@@ -7,13 +7,13 @@ NOTE: Currently still in testing mode, so no guarantees that code will work at a
 To install the most recent version, clone the repository, move into the main directory, and install using `pip`:
 
 ```
-git clone https://github.com/dpesce/DMC.git
-cd DMC
+git clone https://github.com/dpesce/eht-dmc.git
+cd eht-dmc
 pip install .
 ```
 
 ### Recommendations
-Import the `eht-dmc' library using the `dm' alias:
+Import the `eht-dmc` library using the `dm` alias:
 
 ```
 import eht_dmc as dm
