@@ -38,7 +38,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,loose_change=Fa
            xmin(float): minimum x pixel value (uas)
            xmax(float): maximum x pixel value (uas)
            ymin(float): minimum y pixel value (uas)
-           ymax(float): maximum x pixel value (uas)
+           ymax(float): maximum y pixel value (uas)
            
            total_flux_estimate (float): estimate of total Stokes I image flux (Jy)
            offset_window (float): width of square offset window (uas)
@@ -325,7 +325,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
            xmin(float): minimum x pixel value (uas)
            xmax(float): maximum x pixel value (uas)
            ymin(float): minimum y pixel value (uas)
-           ymax(float): maximum x pixel value (uas)
+           ymax(float): maximum y pixel value (uas)
            
            total_flux_estimate (float): estimate of total Stokes I image flux (Jy)
            
@@ -1445,3 +1445,232 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
 
     return modelinfo
 
+def gauss(obs,total_flux_estimate=None,loose_change=False,
+          fit_total_flux=False,allow_offset=False,offset_window=200.0,
+          n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,**kwargs):
+    """ Fit an elliptical Gaussian source structure to a VLBI observation
+
+       Args:
+           obs (obsdata): eht-imaging obsdata object containing VLBI data
+           total_flux_estimate (float): estimate of total Stokes I image flux (Jy)
+    
+           loose_change (bool): flag to use the "loose change" noise prescription
+           fit_total_flux (bool): flag to fit for the total flux
+           allow_offset (bool): flag to permit image centroid to be a free parameter
+           offset_window (float): width of square offset window (uas)
+            
+           n_start (int): initial number of default tuning steps
+           n_burn (int): number of burn-in steps
+           n_tune (int): number of mass matrix tuning steps
+
+           ntuning (int): number of tuning steps to take during last leg
+           ntrials (int): number of posterior samples to take
+           
+       Returns:
+           modelinfo: a dictionary object containing the model fit information
+
+    """
+
+    # some kwarg default values
+    ehtim_convention = kwargs.get('ehtim_convention', True)
+    ref_station = kwargs.get('ref_station','AA')
+    regularize = kwargs.get('regularize',True)
+
+    ###################################################
+    # data bookkeeping
+
+    # first, make sure we're using a Stokes representation
+    if obs.polrep is not 'stokes':
+        obs = obs.switch_polrep('stokes')
+
+    # (u,v) coordinate info
+    u = obs.data['u']
+    v = obs.data['v']
+    rho = np.sqrt((u**2.0) + (v**2.0))
+    phi = (np.pi/2.0) - np.arctan2(v,u)
+
+    # get array of stations
+    ant1 = obs.data['t1']
+    ant2 = obs.data['t2']
+    stations = np.unique(np.concatenate((ant1,ant2)))
+
+    # read in the real and imaginary visibilities
+    I_real = np.real(obs.data['vis'])
+    I_imag = np.imag(obs.data['vis'])
+    I_real_err = obs.data['sigma']
+    I_imag_err = obs.data['sigma']
+
+    # construct mask to remove missing data
+    mask = np.where(np.isfinite(obs.data['vis']))
+
+    # construct design matrices for gain terms
+    T_gains, A_gains = du.gain_account(obs)
+    gain_design_mat_1, gain_design_mat_2 = du.gain_design_mats(obs)
+
+    # if there's no input total flux estimate, estimate it here
+    if total_flux_estimate is None:
+        total_flux_estimate = du.estimate_total_flux(obs)
+
+    ###################################################
+    # organizing prior information
+
+    # prior info for log gain amplitudes
+    loggainamp_mean, loggainamp_std = mu.gain_logamp_prior(obs)
+    
+    # prior info for gain phases
+    gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,ref_station=ref_station)
+
+    # number of gains
+    N_gains = len(loggainamp_mean)
+
+    ###################################################
+    # setting up the model    
+
+    model = pm.Model()
+
+    with model:
+
+        ###############################################
+        # set the priors for the image parameters
+        
+        # total flux prior
+        if fit_total_flux:
+            # set to be normal around the correct value, but bounded positive
+            BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
+            F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate)
+        else:
+            # fix at input value
+            F = total_flux_estimate
+
+        # Gaussian widths
+        sigma_x = eh.RADPERUAS*pm.Uniform('sigma_x',lower=0.0,upper=100.0)
+        sigma_y = eh.RADPERUAS*pm.Uniform('sigma_y',lower=0.0,upper=100.0)
+
+        # Gaussian orientation
+        psi = pm.VonMises('psi',mu=0.0,kappa=0.0001)
+
+        # systematic noise prescription
+        if loose_change:
+            # set the prior on the multiplicative systematic error term to be uniform on [0,1]
+            multiplicative = pm.Uniform('multiplicative',lower=0.0,upper=1.0)
+
+            # set the prior on the additive systematic error term to be uniform on [0,1] Jy
+            additive = pm.Uniform('additive',lower=0.0,upper=1.0)
+        else:
+            multiplicative = 0.0
+            additive = 0.0
+
+        # permit a centroid shift in the image
+        if allow_offset:
+            x0 = eh.RADPERUAS*pm.Uniform('x0',lower=-(offset_window/2.0),upper=(offset_window/2.0))
+            y0 = eh.RADPERUAS*pm.Uniform('y0',lower=-(offset_window/2.0),upper=(offset_window/2.0))
+        else:
+            x0 = 0.0
+            y0 = 0.0
+
+        ###############################################
+        # set the priors for the gain parameters
+
+        # set the gain amplitude priors to be log-normal around the specified inputs
+        logg = pm.Normal('logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
+        g = pm.Deterministic('gain_amps',pm.math.exp(logg))
+        
+        # set the gain phase priors to be periodic uniform on (-pi,pi)
+        theta = pm.VonMises('gain_phases',mu=gainphase_mu,kappa=gainphase_kappa,shape=N_gains)
+
+        ###############################################
+        # compute Fourier transform
+
+        # rotation
+        a = ((pm.math.cos(psi)**2.0)/(2.0*(sigma_x**2.0))) + ((pm.math.sin(psi)**2.0)/(2.0*(sigma_y**2.0)))
+        b = (pm.math.sin(2.0*psi)/(2.0*(sigma_x**2.0))) - (pm.math.sin(2.0*psi)/(2.0*(sigma_y**2.0)))
+        c = ((pm.math.sin(psi)**2.0)/(2.0*(sigma_x**2.0))) + ((pm.math.cos(psi)**2.0)/(2.0*(sigma_y**2.0)))
+        rot_term = (c*(u**2.0)) - (b*u*v) + (a*(v**2.0))
+
+        # shift
+        shift_term = 2.0*np.pi*((u*x0) + (v*y0))
+
+        # FT
+        Ireal_pregain = F*pm.math.cos(shift_term)*pm.math.exp(-4.0*(np.pi**2.0)*(sigma_x**2.0)*(sigma_y**2.0)*rot_term)
+        Iimag_pregain = -F*pm.math.sin(shift_term)*pm.math.exp(-4.0*(np.pi**2.0)*(sigma_x**2.0)*(sigma_y**2.0)*rot_term)
+
+        ###############################################
+        # compute the corruption terms
+
+        gainamp_1 = pm.math.exp(pm.math.dot(gain_design_mat_1,logg))
+        gainamp_2 = pm.math.exp(pm.math.dot(gain_design_mat_2,logg))
+
+        gainphase_1 = pm.math.dot(gain_design_mat_1,theta)
+        gainphase_2 = pm.math.dot(gain_design_mat_2,theta)
+
+        ###############################################
+        # apply corruptions to the model visibilities
+
+        Ireal_model = gainamp_1*gainamp_2*((pm.math.cos(gainphase_1 - gainphase_2)*Ireal_pregain) - (pm.math.sin(gainphase_1 - gainphase_2)*Iimag_pregain))
+        Iimag_model = gainamp_1*gainamp_2*((pm.math.cos(gainphase_1 - gainphase_2)*Iimag_pregain) + (pm.math.sin(gainphase_1 - gainphase_2)*Ireal_pregain))
+
+        ###############################################
+        # add in the systematic noise component
+
+        Itot_model = pm.math.sqrt((Ireal_model**2.0) + (Iimag_model**2.0))
+        Ireal_err_model = pm.math.sqrt((I_real_err**2.0) + ((multiplicative*Itot_model)**2.0) + (additive**2.0))
+        Iimag_err_model = pm.math.sqrt((I_imag_err**2.0) + ((multiplicative*Itot_model)**2.0) + (additive**2.0))
+
+        ###############################################
+        # define the likelihood
+
+        L_real = pm.Normal('L_real',mu=Ireal_model[mask],sd=Ireal_err_model[mask],observed=I_real[mask])
+        L_imag = pm.Normal('L_imag',mu=Iimag_model[mask],sd=Iimag_err_model[mask],observed=I_imag[mask])
+
+        ###############################################
+        # keep track of summed-squared residuals (ssr)
+
+        ssr = pm.Deterministic('ssr',pm.math.sum((((Ireal_model[mask]-I_real[mask])/Ireal_err_model[mask])**2.0) + (((Iimag_model[mask]-I_imag[mask])/Iimag_err_model[mask])**2.0)))
+
+    ###################################################
+    # fit the model
+
+    # NOTE: the current tuning scheme is rather arbitrary
+    # and could likely benefit from systematization
+
+    # set up tuning windows
+    windows = n_start * (2**np.arange(np.floor(np.log2((n_tune - n_burn) / n_start))))
+
+    # keep track of the tuning runs
+    tuning_trace_list = list()
+    with model:
+        start = None
+        burnin_trace = None
+
+        # burn-in and initial mass matrix tuning
+        for istep, steps in enumerate(windows):
+            step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
+            burnin_trace = pm.sample(start=start, tune=steps, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
+            start = [t[-1] for t in burnin_trace._straces.values()]
+            tuning_trace_list.append(burnin_trace)
+
+        # posterior sampling
+        step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH)
+        trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=start, chains=1, discard_tuned_samples=False)
+
+    ###################################################
+    # package the model info
+
+    modelinfo = {'modeltype': 'gauss',
+                 'model': model,
+                 'trace': trace,
+                 'tuning_traces': tuning_trace_list,
+                 'loose_change': loose_change,
+                 'fit_total_flux': fit_total_flux,
+                 'allow_offset': allow_offset,
+                 'offset_window': offset_window,
+                 'total_flux_estimate': total_flux_estimate,
+                 'ntuning': ntuning,
+                 'ntrials': ntrials,
+                 'obs': obs,
+                 'stations': stations,
+                 'T_gains': T_gains,
+                 'A_gains': A_gains
+                 }
+
+    return modelinfo
