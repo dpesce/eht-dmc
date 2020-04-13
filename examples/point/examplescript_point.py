@@ -4,7 +4,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import ehtim as eh
-import dmc as dm
+import eht_dmc as dm
 import pickle
 
 #######################################################
@@ -40,7 +40,7 @@ ntrials = 10000
 modelinfo = dm.models.point(obs,ntuning=ntuning,ntrials=ntrials,total_flux_estimate=1.0)
 
 # save the model file
-dm.io.save_model(modelinfo,'modelinfo.p')
+dm.model_utils.save_model(modelinfo,'modelinfo.p')
 
 #######################################################
 # make some summary plots

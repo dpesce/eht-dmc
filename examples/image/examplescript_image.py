@@ -4,7 +4,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import ehtim as eh
-import dmc as dm
+import eht_dmc as dm
 import pickle
 
 #######################################################
@@ -52,7 +52,7 @@ ntrials = 10000
 modelinfo = dm.models.image(obs,nx,ny,xmin,xmax,ymin,ymax,ntuning=ntuning,ntrials=ntrials,total_flux_estimate=1.0,smooth=True)
 
 # save the model file
-dm.io.save_model(modelinfo,'modelinfo.p')
+dm.model_utils.save_model(modelinfo,'modelinfo.p')
 
 #######################################################
 # make some summary plots
@@ -88,4 +88,4 @@ dm.plotting.gain_cornerplots(modelinfo,'phase')
 # output some eht-imaging compatible files
 
 # save fits file of mean image
-dm.io.save_fits(modelinfo,'mean','image_mean.fits')
+dm.model_utils.save_fits(modelinfo,'mean','image_mean.fits')
