@@ -26,6 +26,7 @@ before_install:
 
 install:
   - pip install cython  # needed before nfft
+  - pip install --upgrade numpy  # travis-ci 3.5 and 3.7 have a bad numpy pre-installed?
   - pip install -r requirements.txt
   - pip install .
 
