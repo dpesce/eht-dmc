@@ -22,6 +22,7 @@ git:
 before_install:
   - sudo apt-get update
   - sudo apt-get -y install libnfft3-dev
+  - sudo apt-get -y install libopenblas-base libopenblas-dev
 
 install:
   - pip install cython  # needed before nfft
