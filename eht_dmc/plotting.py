@@ -67,31 +67,31 @@ def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
     xmax = modelinfo['xmax']
     ymin = modelinfo['ymin']
     ymax = modelinfo['ymax']
-
+    
     # total number of pixels
     npix = nx*ny
-
+    
     # one-dimensional pixel vectors
     x_1d = np.linspace(xmin,xmax,nx)
     y_1d = np.linspace(ymin,ymax,ny)
-
+    
     # two-dimensional pixel vectors
     x2d, y2d = np.meshgrid(x_1d,y_1d,indexing='ij')
-
+    
     # convert from microarcseconds to radians
     x = eh.RADPERUAS*x2d.ravel()
     y = eh.RADPERUAS*y2d.ravel()
-
+    
     # make edge arrays
     xspacing = np.mean(x_1d[1:]-x_1d[0:-1])
     x_edges_1d = np.append(x_1d,x_1d[-1]+xspacing) - (xspacing/2.0)
     yspacing = np.mean(y_1d[1:]-y_1d[0:-1])
     y_edges_1d = np.append(y_1d,y_1d[-1]+yspacing) - (yspacing/2.0)
     x_edges, y_edges = np.meshgrid(x_edges_1d,y_edges_1d,indexing='ij')
-
+    
     ###################################################
     # organize chain info and compute image moment
-
+    
     trace = modelinfo['trace']
 
     # remove burnin
@@ -724,7 +724,7 @@ def plot_polimtot(modelinfo,outname,burnin=0,levels=None):
         U_here = Uvec[i]
         V_here = Vvec[i]
 
-        # linear polarization fractio
+        # linear polarization fraction
         p_here = (np.sum(Q_here) + ((1j)*np.sum(U_here))) / np.sum(I_here)
         pvec[i] = np.abs(p_here)
 

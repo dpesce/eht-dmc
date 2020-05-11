@@ -328,6 +328,20 @@ def make_image(modelinfo,moment,burnin=0):
         im.uvec = Uvec.T[::-1,::-1].ravel()
         im.vvec = Vvec.T[::-1,::-1].ravel()
 
+    # check if image used a smoothing kernel, and if so apply it
+    if modelinfo['smooth']:
+        sigma = trace['sigma'][burnin:]
+        sigma = sigma[div_mask]
+        if moment == 'mean':
+            fwhm_blur = 2.0*np.sqrt(2.0*np.log(2.0))*np.mean(sigma)
+        if moment == 'median':
+            fwhm_blur = 2.0*np.sqrt(2.0*np.log(2.0))*np.median(sigma)
+        if moment == 'std':
+            fwhm_blur = 2.0*np.sqrt(2.0*np.log(2.0))*np.std(sigma)
+        if moment == 'snr':
+            fwhm_blur = 2.0*np.sqrt(2.0*np.log(2.0))*np.mean(sigma)
+        im = im.blur_circ(fwhm_blur*eh.RADPERUAS,fwhm_blur*eh.RADPERUAS)
+
     return im
 
 def save_fits(modelinfo,moment,outfile,burnin=0):
