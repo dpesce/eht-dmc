@@ -168,6 +168,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,loose_change=Fa
 
             # set the prior on the additive systematic error term to be uniform on [0,1] Jy
             additive = pm.Uniform('additive',lower=0.0,upper=1.0)
+
         else:
             # set the prior on the systematic error term to be uniform on [0,1]
             f = pm.Uniform('f',lower=0.0,upper=1.0)
