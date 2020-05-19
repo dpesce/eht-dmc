@@ -1162,10 +1162,9 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
             x0 = 0.0
             y0 = 0.0
 
-        # set the prior on the systematic error term to be log-uniform on [-10,0]
-        logf = pm.Uniform('logf',lower=-10.0,upper=0.0)
-        f = pm.Deterministic('f',pm.math.exp(logf))
-
+        # set the prior on the systematic error term to be uniform on [0,1]
+        f = pm.Uniform('f',lower=0.0,upper=1.0)
+        
         ###############################################
         # set the priors for the gain parameters
 
@@ -1421,7 +1420,7 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
         # burn-in and initial mass matrix tuning
         for istep, steps in enumerate(windows):
             step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
-            burnin_trace = pm.sample(start=start, tune=steps, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
+            burnin_trace = pm.sample(draws=steps, start=start, tune=500, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
             start = [t[-1] for t in burnin_trace._straces.values()]
             tuning_trace_list.append(burnin_trace)
 

@@ -667,7 +667,7 @@ def plot_stepsize(modelinfo,burnin=0):
     # label axes
     ax.set_ylabel('Step size')
     ax.set_xlabel('Trial number')
-
+    
     return stepplot
 
 def plot_polimtot(modelinfo,outname,burnin=0,levels=None):

@@ -140,7 +140,7 @@ def FRvec(obs,ehtim_convention=True):
            FR2: field rotation corrections for the second station
 
     """
-
+    
     # read the elevation angles for each station
     el1 = obs.unpack(['el1'],ang_unit='rad')['el1']
     el2 = obs.unpack(['el2'],ang_unit='rad')['el2']
@@ -179,7 +179,7 @@ def FRvec(obs,ehtim_convention=True):
     # combine to get field rotations for each station
     FR1 = (f_el1*el1) + (f_par1*par1) + f_off1
     FR2 = (f_el2*el2) + (f_par2*par2) + f_off2
-    
+
     # if pre-rotation has been applied, multiply by 2.0
     if ehtim_convention:
         FR1 *= 2.0
