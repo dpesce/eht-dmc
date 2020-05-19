@@ -1021,6 +1021,14 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
     ehtim_convention = kwargs.get('ehtim_convention', True)
     ref_station = kwargs.get('ref_station','AA')
     regularize = kwargs.get('regularize',True)
+    SEFD_error_budget = kwargs.get('SEFD_error_budget',{'AA':0.10,
+                                    'AP':0.11,
+                                    'AZ':0.07,
+                                    'LM':0.22,
+                                    'PV':0.10,
+                                    'SM':0.15,
+                                    'JC':0.14,
+                                    'SP':0.07})
 
     ###################################################
     # data bookkeeping
@@ -1102,7 +1110,7 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
     # organizing prior information
 
     # prior info for log gain amplitudes
-    loggainamp_mean, loggainamp_std = mu.gain_logamp_prior(obs)
+    loggainamp_mean, loggainamp_std = mu.gain_logamp_prior(obs,SEFD_error_budget=SEFD_error_budget)
     
     # prior info for gain phases
     gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,ref_station=ref_station)
@@ -1154,8 +1162,9 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
             x0 = 0.0
             y0 = 0.0
 
-        # set the prior on the systematic error term to be uniform on [0,1]
-        f = pm.Uniform('f',lower=0.0,upper=1.0)
+        # set the prior on the systematic error term to be log-uniform on [-10,0]
+        logf = pm.Uniform('logf',lower=-10.0,upper=0.0)
+        f = pm.Deterministic('f',pm.math.exp(logf))
 
         ###############################################
         # set the priors for the gain parameters
