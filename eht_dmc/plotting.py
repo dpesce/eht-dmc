@@ -15,6 +15,8 @@ import os
 
 from . import model_utils as mu
 
+POLMODELTYPES = ['polpoint','polimage','polgauss']
+
 #######################################################
 # functions
 #######################################################
@@ -266,7 +268,7 @@ def plot_gains(modelinfo,gaintype,burnin=0):
     trace = modelinfo['trace']
 
     # read gains
-    if modelinfo['modeltype'] in ['polpoint','polimage']:
+    if modelinfo['modeltype'] in POLMODELTYPES:
         if gaintype == 'amp':
             gain_R = trace['right_gain_amps'][burnin:]        
             gain_L = trace['left_gain_amps'][burnin:]
@@ -283,7 +285,7 @@ def plot_gains(modelinfo,gaintype,burnin=0):
     div_mask = np.invert(trace[burnin:].diverging)
 
     # compute moments
-    if modelinfo['modeltype'] in ['polpoint','polimage']:
+    if modelinfo['modeltype'] in POLMODELTYPES:
         std_R = np.std(gain_R[div_mask],axis=0)
         med_R = np.median(gain_R[div_mask],axis=0)
         std_L = np.std(gain_L[div_mask],axis=0)
@@ -319,7 +321,7 @@ def plot_gains(modelinfo,gaintype,burnin=0):
         index = (A_gains == ant)
 
         # plot gains
-        if modelinfo['modeltype'] in ['polpoint','polimage']:
+        if modelinfo['modeltype'] in POLMODELTYPES:
             ax.plot(T_gains[index],med_R[index]+offset,linewidth=0,marker='o',markersize=3)
             ax.plot(T_gains[index],med_L[index]+offset,linewidth=0,marker='s',markersize=3)
         else:
@@ -334,7 +336,7 @@ def plot_gains(modelinfo,gaintype,burnin=0):
                 ax.plot([-100.0,100.0],[offset,offset],'k--',linewidth=0.5,alpha=0.3,zorder=-11)
                 
             # increment vertical axis range
-            if modelinfo['modeltype'] in ['polpoint','polimage']:
+            if modelinfo['modeltype'] in POLMODELTYPES:
                 if np.max(med_R[index]+offset) > ymax:
                     ymax = np.max(med_R[index]+offset)
                 if np.max(med_L[index]+offset) > ymax:
@@ -413,7 +415,7 @@ def gain_cornerplots(modelinfo,gaintype,burnin=0,dirname=None,levels=None,smooth
     timestamps = np.sort(np.unique(T_gains))
 
     # read gains
-    if modelinfo['modeltype'] in ['polpoint','polimage']:
+    if modelinfo['modeltype'] in POLMODELTYPES:
         if gaintype == 'amp':
             gain_R = trace['right_gain_amps'][burnin:]        
             gain_L = trace['left_gain_amps'][burnin:]
@@ -428,7 +430,7 @@ def gain_cornerplots(modelinfo,gaintype,burnin=0,dirname=None,levels=None,smooth
 
     # remove divergences
     div_mask = np.invert(trace[burnin:].diverging)
-    if modelinfo['modeltype'] in ['polpoint','polimage']:
+    if modelinfo['modeltype'] in POLMODELTYPES:
         gain_R = gain_R[div_mask]
         gain_L = gain_L[div_mask]
     else:
@@ -450,7 +452,7 @@ def gain_cornerplots(modelinfo,gaintype,burnin=0,dirname=None,levels=None,smooth
         ants_here = A_gains[ind_here]
 
         # initialize arrays of samples
-        if modelinfo['modeltype'] in ['polpoint','polimage']:
+        if modelinfo['modeltype'] in POLMODELTYPES:
             samples_R = np.ndarray(shape=(len(gain_R[:,count]),len(ants_here)))
             samples_L = np.ndarray(shape=(len(gain_L[:,count]),len(ants_here)))
         else:
@@ -462,7 +464,7 @@ def gain_cornerplots(modelinfo,gaintype,burnin=0,dirname=None,levels=None,smooth
         for ia, ant in enumerate(ants_here):
 
             # extract the relevant chain samples
-            if modelinfo['modeltype'] in ['polpoint','polimage']:
+            if modelinfo['modeltype'] in POLMODELTYPES:
                 samples_R[:,ia] = gain_R[:,count]
                 samples_L[:,ia] = gain_L[:,count]
             else:
@@ -479,7 +481,7 @@ def gain_cornerplots(modelinfo,gaintype,burnin=0,dirname=None,levels=None,smooth
             # increment counter
             count += 1
 
-        if modelinfo['modeltype'] in ['polpoint','polimage']:
+        if modelinfo['modeltype'] in POLMODELTYPES:
             fig = corner.corner(samples_R,labels=labels,show_titles=False,title_fmt='.4f',levels=levels,
                                 title_kwargs={"fontsize": 12},smooth=smooth,smooth1d=smooth,plot_datapoints=False,
                                 plot_density=False,fill_contours=True,range=ranges,bins=100,color='cornflowerblue')
