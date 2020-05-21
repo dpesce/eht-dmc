@@ -1124,6 +1124,12 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
     gainphase_mu_R, gainphase_kappa_R = mu.gain_phase_prior(obs,ref_station=ref_station)
     gainphase_mu_L, gainphase_kappa_L = mu.gain_phase_prior(obs,ref_station=None)
 
+    if ref_station is not None:
+        ind_ref = (A_gains == ref_station)
+        gainphase_kappa_temp = np.copy(gainphase_kappa_L[ind_ref])
+        gainphase_kappa_temp[0] = 10000.0
+        gainphase_kappa_L[ind_ref] = gainphase_kappa_temp
+
     ###################################################
     # setting up the model
 
