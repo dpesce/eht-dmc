@@ -1198,7 +1198,7 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
                 g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
             else:
                 g_L = BoundedNormal('left_gain_amps',mu=np.exp(loggainamp_mean),sd=loggainamp_std,shape=N_gains)
-                logg_L = pm.Deterministic('left_logg',pm.math.log(g_R))
+                logg_L = pm.Deterministic('left_logg',pm.math.log(g_L))
         
         # set the gain phase priors to be periodic uniform on (-pi,pi)
         theta_R = pm.VonMises('right_gain_phases',mu=gainphase_mu,kappa=gainphase_kappa,shape=N_gains)
