@@ -992,7 +992,8 @@ def point(obs,total_flux_estimate=None,fit_total_flux=True,
 
 def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
              fit_total_flux=False,allow_offset=False,offset_window=200.0,
-             n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,**kwargs):
+             n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,
+             gain_amp_prior='log',**kwargs):
     """ Fit a polarized point source model to a VLBI observation
 
        Args:
@@ -1011,11 +1012,16 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
 
            ntuning (int): number of tuning steps to take during last leg
            ntrials (int): number of posterior samples to take
+
+           gain_amp_prior (str): form of the gain amplitude prior; options are 'log', 'normal'
            
        Returns:
            modelinfo: a dictionary object containing the model fit information
 
     """
+
+    if gain_amp_prior not in ['log','normal']:
+        raise Exception('gain_amp_prior keyword argument must be log or normal.')
 
     # some kwarg default values
     ehtim_convention = kwargs.get('ehtim_convention', True)
@@ -1029,6 +1035,8 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
                                     'SM':0.15,
                                     'JC':0.14,
                                     'SP':0.07})
+    max_treedepth = kwargs.get('max_treedepth',MAX_TREEDEPTH)
+    early_max_treedepth = kwargs.get('early_max_treedepth',EARLY_MAX_TREEDEPTH)
 
     ###################################################
     # data bookkeeping
@@ -1168,16 +1176,29 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
         ###############################################
         # set the priors for the gain parameters
 
-        # set the gain amplitude priors to be log-normal around the specified inputs
-        logg_R = pm.Normal('right_logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
-        g_R = pm.Deterministic('right_gain_amps',pm.math.exp(logg_R))
+        if gain_amp_prior == 'log':
+            # set the gain amplitude priors to be log-normal around the specified inputs
+            logg_R = pm.Normal('right_logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
+            g_R = pm.Deterministic('right_gain_amps',pm.math.exp(logg_R))
 
-        if RLequal:
-            logg_L = pm.Deterministic('left_logg',logg_R)
-            g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
-        else:
-            logg_L = pm.Normal('left_logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
-            g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
+            if RLequal:
+                logg_L = pm.Deterministic('left_logg',logg_R)
+                g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
+            else:
+                logg_L = pm.Normal('left_logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
+                g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
+        if gain_amp_prior == 'normal':
+            # set the gain amplitude priors to be normal around the specified inputs
+            BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
+            g_R = BoundedNormal('right_gain_amps',mu=np.exp(loggainamp_mean),sd=loggainamp_std,shape=N_gains)
+            logg_R = pm.Deterministic('right_logg',pm.math.log(g_R))
+
+            if RLequal:
+                logg_L = pm.Deterministic('left_logg',logg_R)
+                g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
+            else:
+                g_L = BoundedNormal('left_gain_amps',mu=np.exp(loggainamp_mean),sd=loggainamp_std,shape=N_gains)
+                logg_L = pm.Deterministic('left_logg',pm.math.log(g_R))
         
         # set the gain phase priors to be periodic uniform on (-pi,pi)
         theta_R = pm.VonMises('right_gain_phases',mu=gainphase_mu,kappa=gainphase_kappa,shape=N_gains)
@@ -1419,13 +1440,13 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
 
         # burn-in and initial mass matrix tuning
         for istep, steps in enumerate(windows):
-            step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
+            step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth,regularize=regularize)
             burnin_trace = pm.sample(draws=steps, start=start, tune=500, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
             start = [t[-1] for t in burnin_trace._straces.values()]
             tuning_trace_list.append(burnin_trace)
 
         # posterior sampling
-        step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
+        step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth,regularize=regularize)
         trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=start, chains=1, discard_tuned_samples=False)
 
     ###################################################
@@ -1446,7 +1467,8 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
                  'obs': obs,
                  'stations': stations,
                  'T_gains': T_gains,
-                 'A_gains': A_gains
+                 'A_gains': A_gains,
+                 'gain_amp_prior': gain_amp_prior
                  }
 
     return modelinfo
