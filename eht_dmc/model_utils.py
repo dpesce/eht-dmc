@@ -121,14 +121,15 @@ def gain_phase_prior(obs,ref_station='AA'):
     gainphase_kappa = 0.0001*np.ones(N_gains)
 
     # set reference station standard devation to be tiny
-    for it, t in enumerate(timestamps):
-        index = (T_gains == t)
-        ants_here = A_gains[index]
-        for ant in ants_here:
-            if ant == ref_station:
-                ind = ((T_gains == t) & (A_gains == ant))
-                gainphase_kappa[ind] = 10000.0
-                break
+    if ref_station is not None:
+        for it, t in enumerate(timestamps):
+            index = (T_gains == t)
+            ants_here = A_gains[index]
+            for ant in ants_here:
+                if ant == ref_station:
+                    ind = ((T_gains == t) & (A_gains == ant))
+                    gainphase_kappa[ind] = 10000.0
+                    break
 
     return gainphase_mu, gainphase_kappa
 
