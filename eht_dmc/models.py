@@ -1121,7 +1121,8 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
     loggainamp_mean, loggainamp_std = mu.gain_logamp_prior(obs,SEFD_error_budget=SEFD_error_budget)
     
     # prior info for gain phases
-    gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,ref_station=ref_station)
+    gainphase_mu_R, gainphase_kappa_R = mu.gain_phase_prior(obs,ref_station=ref_station)
+    gainphase_mu_L, gainphase_kappa_L = mu.gain_phase_prior(obs,ref_station=None)
 
     ###################################################
     # setting up the model
@@ -1201,13 +1202,13 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
                 logg_L = pm.Deterministic('left_logg',pm.math.log(g_L))
         
         # set the gain phase priors to be periodic uniform on (-pi,pi)
-        theta_R = pm.VonMises('right_gain_phases',mu=gainphase_mu,kappa=gainphase_kappa,shape=N_gains)
+        theta_R = pm.VonMises('right_gain_phases',mu=gainphase_mu_R,kappa=gainphase_kappa_R,shape=N_gains)
         
         if RLequal:
             theta_L = pm.Deterministic('left_gain_phases',theta_R)
         else:
-            theta_L = pm.VonMises('left_gain_phases',mu=gainphase_mu,kappa=gainphase_kappa,shape=N_gains)
-
+            theta_L = pm.VonMises('left_gain_phases',mu=gainphase_mu_L,kappa=gainphase_kappa_L,shape=N_gains)
+        
         ###############################################
         # set the priors for the leakage parameters
         
