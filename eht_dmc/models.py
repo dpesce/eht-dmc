@@ -313,7 +313,8 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,loose_change=Fa
 
 def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
           fit_StokesV=True,fit_total_flux=False,smooth=None,n_start=25,n_burn=500,
-          n_tune=5000,ntuning=2000,ntrials=10000,gain_amp_prior='normal',**kwargs):
+          n_tune=5000,ntuning=2000,ntrials=10000,gain_amp_prior='normal',
+          const_ref_RL=True,**kwargs):
     """ Fit a polarimetric image to a VLBI observation
 
        Args:
@@ -473,12 +474,17 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
     # prior info for gain phases
     gainphase_mu_R, gainphase_kappa_R = mu.gain_phase_prior(obs,ref_station=ref_station)
     gainphase_mu_L, gainphase_kappa_L = mu.gain_phase_prior(obs,ref_station=None)
-
-    if ref_station is not None:
-        ind_ref = (A_gains == ref_station)
-        gainphase_kappa_temp = np.copy(gainphase_kappa_L[ind_ref])
-        gainphase_kappa_temp[0] = 10000.0
-        gainphase_kappa_L[ind_ref] = gainphase_kappa_temp
+    
+    if const_ref_RL:
+        if ref_station is not None:
+            ind_ref = (A_gains == ref_station)
+            gainphase_kappa_L[ind_ref] = 10000.0
+    else:
+        if ref_station is not None:
+            ind_ref = (A_gains == ref_station)
+            gainphase_kappa_temp = np.copy(gainphase_kappa_L[ind_ref])
+            gainphase_kappa_temp[0] = 10000.0
+            gainphase_kappa_L[ind_ref] = gainphase_kappa_temp
 
     # specify the Dirichlet weights; 1 = flat; <1 = sparse; >1 = smooth
     dirichlet_weights = 1.0*np.ones_like(x)
