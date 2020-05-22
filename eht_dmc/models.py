@@ -1064,7 +1064,7 @@ def point(obs,total_flux_estimate=None,fit_total_flux=True,
 def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
              fit_total_flux=False,allow_offset=False,offset_window=200.0,
              n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,
-             gain_amp_prior='normal',**kwargs):
+             gain_amp_prior='normal',const_ref_RL=True,**kwargs):
     """ Fit a polarized point source model to a VLBI observation
 
        Args:
@@ -1195,11 +1195,16 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
     gainphase_mu_R, gainphase_kappa_R = mu.gain_phase_prior(obs,ref_station=ref_station)
     gainphase_mu_L, gainphase_kappa_L = mu.gain_phase_prior(obs,ref_station=None)
 
-    if ref_station is not None:
-        ind_ref = (A_gains == ref_station)
-        gainphase_kappa_temp = np.copy(gainphase_kappa_L[ind_ref])
-        gainphase_kappa_temp[0] = 10000.0
-        gainphase_kappa_L[ind_ref] = gainphase_kappa_temp
+    if const_ref_RL:
+        if ref_station is not None:
+            ind_ref = (A_gains == ref_station)
+            gainphase_kappa_L[ind_ref] = 10000.0
+    else:
+        if ref_station is not None:
+            ind_ref = (A_gains == ref_station)
+            gainphase_kappa_temp = np.copy(gainphase_kappa_L[ind_ref])
+            gainphase_kappa_temp[0] = 10000.0
+            gainphase_kappa_L[ind_ref] = gainphase_kappa_temp
 
     ###################################################
     # setting up the model
@@ -1546,7 +1551,8 @@ def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
                  'stations': stations,
                  'T_gains': T_gains,
                  'A_gains': A_gains,
-                 'gain_amp_prior': gain_amp_prior
+                 'gain_amp_prior': gain_amp_prior,
+                 'const_ref_RL': const_ref_RL
                  }
 
     return modelinfo
