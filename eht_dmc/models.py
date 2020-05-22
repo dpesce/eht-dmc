@@ -312,8 +312,8 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,loose_change=Fa
     return modelinfo
 
 def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
-          fit_StokesV=True,fit_total_flux=False,n_start=25,n_burn=500,n_tune=5000,
-          ntuning=2000,ntrials=10000,**kwargs):
+          fit_StokesV=True,fit_total_flux=False,smooth=None,n_start=25,n_burn=500,
+          n_tune=5000,ntuning=2000,ntrials=10000,gain_amp_prior='normal',**kwargs):
     """ Fit a polarimetric image to a VLBI observation
 
        Args:
@@ -326,6 +326,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
            ymax(float): maximum y pixel value (uas)
            
            total_flux_estimate (float): estimate of total Stokes I image flux (Jy)
+           smooth (float): smoothing kernel FWHM (uas)
            
            RLequal (bool): flag to fix right and left gain terms to be equal
            fit_StokesV (bool): flag to fit for Stokes V; set to False to fix V = 0
@@ -339,20 +340,33 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
            ntrials (int): number of posterior samples to take
            
        Returns:
-           modelinfo: a dictionary object containing the model fit information
+           modelinfo: a dictionary containing the model fit information
 
     """
+
+    if gain_amp_prior not in ['log','normal']:
+        raise Exception('gain_amp_prior keyword argument must be log or normal.')
 
     # some kwarg default values
     ehtim_convention = kwargs.get('ehtim_convention', True)
     ref_station = kwargs.get('ref_station','AA')
     regularize = kwargs.get('regularize',True)
+    SEFD_error_budget = kwargs.get('SEFD_error_budget',{'AA':0.10,
+                                    'AP':0.11,
+                                    'AZ':0.07,
+                                    'LM':0.22,
+                                    'PV':0.10,
+                                    'SM':0.15,
+                                    'JC':0.14,
+                                    'SP':0.07})
+    max_treedepth = kwargs.get('max_treedepth',MAX_TREEDEPTH)
+    early_max_treedepth = kwargs.get('early_max_treedepth',EARLY_MAX_TREEDEPTH)
 
     ###################################################
     # data bookkeeping
 
     # first, make sure we're using a circular representation
-    if obs.polrep is not 'circ':
+    if obs.polrep != 'circ':
         obs = obs.switch_polrep('circ')
 
     # (u,v) coordinate info
@@ -454,10 +468,17 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
     # organizing prior information
 
     # prior info for log gain amplitudes
-    loggainamp_mean, loggainamp_std = mu.gain_logamp_prior(obs)
-
+    loggainamp_mean, loggainamp_std = mu.gain_logamp_prior(obs,SEFD_error_budget=SEFD_error_budget)
+    
     # prior info for gain phases
-    gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,ref_station=ref_station)
+    gainphase_mu_R, gainphase_kappa_R = mu.gain_phase_prior(obs,ref_station=ref_station)
+    gainphase_mu_L, gainphase_kappa_L = mu.gain_phase_prior(obs,ref_station=None)
+
+    if ref_station is not None:
+        ind_ref = (A_gains == ref_station)
+        gainphase_kappa_temp = np.copy(gainphase_kappa_L[ind_ref])
+        gainphase_kappa_temp[0] = 10000.0
+        gainphase_kappa_L[ind_ref] = gainphase_kappa_temp
 
     # specify the Dirichlet weights; 1 = flat; <1 = sparse; >1 = smooth
     dirichlet_weights = 1.0*np.ones_like(x)
@@ -509,28 +530,46 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
         # set the prior on the systematic error term to be uniform on [0,1]
         f = pm.Uniform('f',lower=0.0,upper=1.0)
 
+        # Gaussian smoothing kernel parameters
+        if smooth is not None:
+            # smoothing width
+            sigma = eh.RADPERUAS*(smooth/(2.0*np.sqrt(2.0*np.log(2.0))))
+
         ###############################################
         # set the priors for the gain parameters
 
-        # set the gain amplitude priors to be log-normal around the specified inputs
-        logg_R = pm.Normal('right_logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
-        g_R = pm.Deterministic('right_gain_amps',pm.math.exp(logg_R))
+        if gain_amp_prior == 'log':
+            # set the gain amplitude priors to be log-normal around the specified inputs
+            logg_R = pm.Normal('right_logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
+            g_R = pm.Deterministic('right_gain_amps',pm.math.exp(logg_R))
 
-        if RLequal:
-            logg_L = pm.Deterministic('left_logg',logg_R)
-            g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
-        else:
-            logg_L = pm.Normal('left_logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
-            g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
+            if RLequal:
+                logg_L = pm.Deterministic('left_logg',logg_R)
+                g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
+            else:
+                logg_L = pm.Normal('left_logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
+                g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
+        if gain_amp_prior == 'normal':
+            # set the gain amplitude priors to be normal around the specified inputs
+            BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
+            g_R = BoundedNormal('right_gain_amps',mu=np.exp(loggainamp_mean),sd=loggainamp_std,shape=N_gains)
+            logg_R = pm.Deterministic('right_logg',pm.math.log(g_R))
+
+            if RLequal:
+                logg_L = pm.Deterministic('left_logg',logg_R)
+                g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
+            else:
+                g_L = BoundedNormal('left_gain_amps',mu=np.exp(loggainamp_mean),sd=loggainamp_std,shape=N_gains)
+                logg_L = pm.Deterministic('left_logg',pm.math.log(g_L))
         
         # set the gain phase priors to be periodic uniform on (-pi,pi)
-        theta_R = pm.VonMises('right_gain_phases',mu=gainphase_mu,kappa=gainphase_kappa,shape=N_gains)
+        theta_R = pm.VonMises('right_gain_phases',mu=gainphase_mu_R,kappa=gainphase_kappa_R,shape=N_gains)
         
         if RLequal:
             theta_L = pm.Deterministic('left_gain_phases',theta_R)
         else:
-            theta_L = pm.VonMises('left_gain_phases',mu=gainphase_mu,kappa=gainphase_kappa,shape=N_gains)
-
+            theta_L = pm.VonMises('left_gain_phases',mu=gainphase_mu_L,kappa=gainphase_kappa_L,shape=N_gains)
+        
         ###############################################
         # set the priors for the leakage parameters
         
@@ -561,17 +600,45 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
         ###############################################
         # perform the required Fourier transforms
         
-        Ireal = pm.math.dot(A_real,I)
-        Iimag = pm.math.dot(A_imag,I)
+        Ireal_presmooth = pm.math.dot(A_real,I)
+        Iimag_presmooth = pm.math.dot(A_imag,I)
         
-        Qreal = pm.math.dot(A_real,Q)
-        Qimag = pm.math.dot(A_imag,Q)
+        Qreal_presmooth = pm.math.dot(A_real,Q)
+        Qimag_presmooth = pm.math.dot(A_imag,Q)
         
-        Ureal = pm.math.dot(A_real,U)
-        Uimag = pm.math.dot(A_imag,U)
+        Ureal_presmooth = pm.math.dot(A_real,U)
+        Uimag_presmooth = pm.math.dot(A_imag,U)
         
-        Vreal = pm.math.dot(A_real,V)
-        Vimag = pm.math.dot(A_imag,V)
+        Vreal_presmooth = pm.math.dot(A_real,V)
+        Vimag_presmooth = pm.math.dot(A_imag,V)
+
+        ###############################################
+        # smooth with the Gaussian kernel
+        
+        if smooth is not None:
+            Ireal = Ireal_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
+            Iimag = Iimag_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
+
+            Qreal = Qreal_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
+            Qimag = Qimag_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
+
+            Ureal = Ureal_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
+            Uimag = Uimag_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
+
+            Vreal = Vreal_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
+            Vimag = Vimag_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
+        else:
+            Ireal = Ireal_presmooth
+            Iimag = Iimag_presmooth
+
+            Qreal = Qreal_presmooth
+            Qimag = Qimag_presmooth
+
+            Ureal = Ureal_presmooth
+            Uimag = Uimag_presmooth
+
+            Vreal = Vreal_presmooth
+            Vimag = Vimag_presmooth
 
         ###############################################
         # construct the pre-corrupted circular basis model visibilities
@@ -694,17 +761,19 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
         ###############################################
         # add in the systematic noise component
 
-        RR_real_err_model = pm.math.sqrt((RR_real_err**2.0) + (f*F)**2.0)
-        RR_imag_err_model = pm.math.sqrt((RR_imag_err**2.0) + (f*F)**2.0)
+        Itot_model = pm.math.sqrt(((0.5*(RR_real_model+LL_real_model))**2.0) + ((0.5*(RR_imag_model+LL_imag_model))**2.0))
+        
+        RR_real_err_model = pm.math.sqrt((RR_real_err**2.0) + (f*Itot_model)**2.0)
+        RR_imag_err_model = pm.math.sqrt((RR_imag_err**2.0) + (f*Itot_model)**2.0)
 
-        LL_real_err_model = pm.math.sqrt((LL_real_err**2.0) + (f*F)**2.0)
-        LL_imag_err_model = pm.math.sqrt((LL_imag_err**2.0) + (f*F)**2.0)
+        LL_real_err_model = pm.math.sqrt((LL_real_err**2.0) + (f*Itot_model)**2.0)
+        LL_imag_err_model = pm.math.sqrt((LL_imag_err**2.0) + (f*Itot_model)**2.0)
 
-        RL_real_err_model = pm.math.sqrt((RL_real_err**2.0) + (f*F)**2.0)
-        RL_imag_err_model = pm.math.sqrt((RL_imag_err**2.0) + (f*F)**2.0)
+        RL_real_err_model = pm.math.sqrt((RL_real_err**2.0) + (f*Itot_model)**2.0)
+        RL_imag_err_model = pm.math.sqrt((RL_imag_err**2.0) + (f*Itot_model)**2.0)
 
-        LR_real_err_model = pm.math.sqrt((LR_real_err**2.0) + (f*F)**2.0)
-        LR_imag_err_model = pm.math.sqrt((LR_imag_err**2.0) + (f*F)**2.0)
+        LR_real_err_model = pm.math.sqrt((LR_real_err**2.0) + (f*Itot_model)**2.0)
+        LR_imag_err_model = pm.math.sqrt((LR_imag_err**2.0) + (f*Itot_model)**2.0)
 
         ###############################################
         # define the likelihood
@@ -777,7 +846,9 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
                  'obs': obs,
                  'stations': stations,
                  'T_gains': T_gains,
-                 'A_gains': A_gains
+                 'A_gains': A_gains,
+                 'smooth': smooth,
+                 'gain_amp_prior': gain_amp_prior
                  }
 
     return modelinfo
@@ -993,7 +1064,7 @@ def point(obs,total_flux_estimate=None,fit_total_flux=True,
 def polpoint(obs,total_flux_estimate=None,RLequal=False,fit_StokesV=True,
              fit_total_flux=False,allow_offset=False,offset_window=200.0,
              n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,
-             gain_amp_prior='log',**kwargs):
+             gain_amp_prior='normal',**kwargs):
     """ Fit a polarized point source model to a VLBI observation
 
        Args:
