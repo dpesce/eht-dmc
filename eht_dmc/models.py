@@ -314,7 +314,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,loose_change=Fa
 def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
           fit_StokesV=True,fit_total_flux=False,smooth=None,n_start=25,n_burn=500,
           n_tune=5000,ntuning=2000,ntrials=10000,gain_amp_prior='normal',
-          const_ref_RL=True,fit_gains=True,**kwargs):
+          const_ref_RL=True,fit_gains=True,fit_smooth=False,fit_syserr=True,**kwargs):
     """ Fit a polarimetric image to a VLBI observation
 
        Args:
@@ -333,6 +333,8 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
            fit_StokesV (bool): flag to fit for Stokes V; set to False to fix V = 0
            fit_total_flux (bool): flag to fit for the total flux
            fit_gains (bool): flag to fit for the complex gains
+           fit_smooth (bool): flag to fit for the smoothing kernel
+           fit_syserr (bool): flag to fit for a multiplicative systematic error component
             
            n_start (int): initial number of default tuning steps
            n_burn (int): number of burn-in steps
@@ -534,13 +536,19 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
             cosbeta = 0.0
         sinbeta = pm.math.sqrt(1.0 - (cosbeta**2.0))
 
-        # set the prior on the systematic error term to be uniform on [0,1]
-        f = pm.Uniform('f',lower=0.0,upper=1.0)
+        if fit_syserr:
+            # set the prior on the systematic error term to be uniform on [0,1]
+            f = pm.Uniform('f',lower=0.0,upper=1.0)
+        else:
+            f = 0.0
 
         # Gaussian smoothing kernel parameters
-        if smooth is not None:
+        if (smooth is not None) & (fit_smooth == False):
             # smoothing width
             sigma = eh.RADPERUAS*(smooth/(2.0*np.sqrt(2.0*np.log(2.0))))
+        elif (fit_smooth == True):
+            # smoothing width
+            sigma = eh.RADPERUAS*pm.Uniform('sigma',lower=0.0,upper=100.0)
 
         ###############################################
         # set the priors for the gain parameters
@@ -624,7 +632,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
         ###############################################
         # smooth with the Gaussian kernel
         
-        if smooth is not None:
+        if (smooth is not None) | (fit_smooth == True):
             Ireal = Ireal_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
             Iimag = Iimag_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
 
@@ -870,7 +878,9 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
                  'A_gains': A_gains,
                  'smooth': smooth,
                  'gain_amp_prior': gain_amp_prior,
-                 'fit_gains': fit_gains
+                 'fit_gains': fit_gains,
+                 'fit_smooth': fit_smooth,
+                 'fit_syserr': fit_syserr
                  }
 
     return modelinfo
