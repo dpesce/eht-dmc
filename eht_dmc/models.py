@@ -314,7 +314,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,loose_change=Fa
 def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
           fit_StokesV=True,fit_total_flux=False,smooth=None,n_start=25,n_burn=500,
           n_tune=5000,ntuning=2000,ntrials=10000,gain_amp_prior='normal',
-          const_ref_RL=True,**kwargs):
+          const_ref_RL=True,fit_gains=True,**kwargs):
     """ Fit a polarimetric image to a VLBI observation
 
        Args:
@@ -332,6 +332,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
            RLequal (bool): flag to fix right and left gain terms to be equal
            fit_StokesV (bool): flag to fit for Stokes V; set to False to fix V = 0
            fit_total_flux (bool): flag to fit for the total flux
+           fit_gains (bool): flag to fit for the complex gains
             
            n_start (int): initial number of default tuning steps
            n_burn (int): number of burn-in steps
@@ -544,38 +545,40 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
         ###############################################
         # set the priors for the gain parameters
 
-        if gain_amp_prior == 'log':
-            # set the gain amplitude priors to be log-normal around the specified inputs
-            logg_R = pm.Normal('right_logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
-            g_R = pm.Deterministic('right_gain_amps',pm.math.exp(logg_R))
+        if fit_gains:
 
-            if RLequal:
-                logg_L = pm.Deterministic('left_logg',logg_R)
-                g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
-            else:
-                logg_L = pm.Normal('left_logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
-                g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
-        if gain_amp_prior == 'normal':
-            # set the gain amplitude priors to be normal around the specified inputs
-            BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
-            g_R = BoundedNormal('right_gain_amps',mu=np.exp(loggainamp_mean),sd=loggainamp_std,shape=N_gains)
-            logg_R = pm.Deterministic('right_logg',pm.math.log(g_R))
+            if gain_amp_prior == 'log':
+                # set the gain amplitude priors to be log-normal around the specified inputs
+                logg_R = pm.Normal('right_logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
+                g_R = pm.Deterministic('right_gain_amps',pm.math.exp(logg_R))
 
+                if RLequal:
+                    logg_L = pm.Deterministic('left_logg',logg_R)
+                    g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
+                else:
+                    logg_L = pm.Normal('left_logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
+                    g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
+            if gain_amp_prior == 'normal':
+                # set the gain amplitude priors to be normal around the specified inputs
+                BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
+                g_R = BoundedNormal('right_gain_amps',mu=np.exp(loggainamp_mean),sd=loggainamp_std,shape=N_gains)
+                logg_R = pm.Deterministic('right_logg',pm.math.log(g_R))
+
+                if RLequal:
+                    logg_L = pm.Deterministic('left_logg',logg_R)
+                    g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
+                else:
+                    g_L = BoundedNormal('left_gain_amps',mu=np.exp(loggainamp_mean),sd=loggainamp_std,shape=N_gains)
+                    logg_L = pm.Deterministic('left_logg',pm.math.log(g_L))
+            
+            # set the gain phase priors to be periodic uniform on (-pi,pi)
+            theta_R = pm.VonMises('right_gain_phases',mu=gainphase_mu_R,kappa=gainphase_kappa_R,shape=N_gains)
+            
             if RLequal:
-                logg_L = pm.Deterministic('left_logg',logg_R)
-                g_L = pm.Deterministic('left_gain_amps',pm.math.exp(logg_L))
+                theta_L = pm.Deterministic('left_gain_phases',theta_R)
             else:
-                g_L = BoundedNormal('left_gain_amps',mu=np.exp(loggainamp_mean),sd=loggainamp_std,shape=N_gains)
-                logg_L = pm.Deterministic('left_logg',pm.math.log(g_L))
-        
-        # set the gain phase priors to be periodic uniform on (-pi,pi)
-        theta_R = pm.VonMises('right_gain_phases',mu=gainphase_mu_R,kappa=gainphase_kappa_R,shape=N_gains)
-        
-        if RLequal:
-            theta_L = pm.Deterministic('left_gain_phases',theta_R)
-        else:
-            theta_L = pm.VonMises('left_gain_phases',mu=gainphase_mu_L,kappa=gainphase_kappa_L,shape=N_gains)
-        
+                theta_L = pm.VonMises('left_gain_phases',mu=gainphase_mu_L,kappa=gainphase_kappa_L,shape=N_gains)
+            
         ###############################################
         # set the priors for the leakage parameters
         
@@ -664,15 +667,27 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
         ###############################################
         # compute the corruption terms
         
-        gainamp_R1 = pm.math.exp(pm.math.dot(gain_design_mat_1,logg_R))
-        gainamp_R2 = pm.math.exp(pm.math.dot(gain_design_mat_2,logg_R))
-        gainamp_L1 = pm.math.exp(pm.math.dot(gain_design_mat_1,logg_L))
-        gainamp_L2 = pm.math.exp(pm.math.dot(gain_design_mat_2,logg_L))
-        
-        gainphase_R1 = pm.math.dot(gain_design_mat_1,theta_R)
-        gainphase_R2 = pm.math.dot(gain_design_mat_2,theta_R)
-        gainphase_L1 = pm.math.dot(gain_design_mat_1,theta_L)
-        gainphase_L2 = pm.math.dot(gain_design_mat_2,theta_L)
+        if fit_gains:
+            gainamp_R1 = pm.math.exp(pm.math.dot(gain_design_mat_1,logg_R))
+            gainamp_R2 = pm.math.exp(pm.math.dot(gain_design_mat_2,logg_R))
+            gainamp_L1 = pm.math.exp(pm.math.dot(gain_design_mat_1,logg_L))
+            gainamp_L2 = pm.math.exp(pm.math.dot(gain_design_mat_2,logg_L))
+
+            gainphase_R1 = pm.math.dot(gain_design_mat_1,theta_R)
+            gainphase_R2 = pm.math.dot(gain_design_mat_2,theta_R)
+            gainphase_L1 = pm.math.dot(gain_design_mat_1,theta_L)
+            gainphase_L2 = pm.math.dot(gain_design_mat_2,theta_L)
+
+        else:
+            gainamp_R1 = 1.0
+            gainamp_R2 = 1.0
+            gainamp_L1 = 1.0
+            gainamp_L2 = 1.0
+
+            gainphase_R1 = 0.0
+            gainphase_R2 = 0.0
+            gainphase_L1 = 0.0
+            gainphase_L2 = 0.0
         
         Damp_R1 = pm.math.exp(pm.math.dot(dterm_design_mat_1,logDamp_R))
         Damp_R2 = pm.math.exp(pm.math.dot(dterm_design_mat_2,logDamp_R))
@@ -854,7 +869,8 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
                  'T_gains': T_gains,
                  'A_gains': A_gains,
                  'smooth': smooth,
-                 'gain_amp_prior': gain_amp_prior
+                 'gain_amp_prior': gain_amp_prior,
+                 'fit_gains': fit_gains
                  }
 
     return modelinfo
