@@ -312,9 +312,10 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,loose_change=Fa
     return modelinfo
 
 def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
-          fit_StokesV=True,fit_total_flux=False,smooth=None,n_start=25,n_burn=500,
-          n_tune=5000,ntuning=2000,ntrials=10000,gain_amp_prior='normal',
-          const_ref_RL=True,fit_gains=True,fit_smooth=False,fit_syserr=True,**kwargs):
+          fit_StokesV=True,fit_total_flux=False,allow_offset=False,offset_window=200.0,
+          smooth=None,n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,
+          gain_amp_prior='normal',const_ref_RL=True,fit_gains=True,fit_smooth=False,
+          fit_syserr=True,**kwargs):
     """ Fit a polarimetric image to a VLBI observation
 
        Args:
@@ -327,6 +328,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
            ymax(float): maximum y pixel value (uas)
            
            total_flux_estimate (float): estimate of total Stokes I image flux (Jy)
+           offset_window (float): width of square offset window (uas)
            smooth (float): smoothing kernel FWHM (uas)
            
            RLequal (bool): flag to fix right and left gain terms to be equal
@@ -335,7 +337,8 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
            fit_gains (bool): flag to fit for the complex gains
            fit_smooth (bool): flag to fit for the smoothing kernel
            fit_syserr (bool): flag to fit for a multiplicative systematic error component
-            
+           allow_offset (bool): flag to permit image centroid to be a free parameter
+
            n_start (int): initial number of default tuning steps
            n_burn (int): number of burn-in steps
            n_tune (int): number of mass matrix tuning steps
@@ -542,6 +545,14 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
         else:
             f = 0.0
 
+        # permit a centroid shift in the image
+        if allow_offset:
+            x0 = eh.RADPERUAS*pm.Uniform('x0',lower=-(offset_window/2.0),upper=(offset_window/2.0))
+            y0 = eh.RADPERUAS*pm.Uniform('y0',lower=-(offset_window/2.0),upper=(offset_window/2.0))
+        else:
+            x0 = 0.0
+            y0 = 0.0
+
         # Gaussian smoothing kernel parameters
         if (smooth is not None) & (fit_smooth == False):
             # smoothing width
@@ -658,19 +669,36 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
             Vimag = Vimag_presmooth
 
         ###############################################
+        # shift centroid
+
+        shift_term = 2.0*np.pi*((u*x0) + (v*y0))
+
+        Ireal_pregain = (Ireal*pm.math.cos(shift_term)) + (Iimag*pm.math.sin(shift_term))
+        Iimag_pregain = (Iimag*pm.math.cos(shift_term)) - (Ireal*pm.math.sin(shift_term))
+
+        Qreal_pregain = (Qreal*pm.math.cos(shift_term)) + (Qimag*pm.math.sin(shift_term))
+        Qimag_pregain = (Qimag*pm.math.cos(shift_term)) - (Qreal*pm.math.sin(shift_term))
+
+        Ureal_pregain = (Ureal*pm.math.cos(shift_term)) + (Uimag*pm.math.sin(shift_term))
+        Uimag_pregain = (Uimag*pm.math.cos(shift_term)) - (Ureal*pm.math.sin(shift_term))
+
+        Vreal_pregain = (Vreal*pm.math.cos(shift_term)) + (Vimag*pm.math.sin(shift_term))
+        Vimag_pregain = (Vimag*pm.math.cos(shift_term)) - (Vreal*pm.math.sin(shift_term))
+
+        ###############################################
         # construct the pre-corrupted circular basis model visibilities
 
-        RR_real_pregain = Ireal + Vreal
-        RR_imag_pregain = Iimag + Vimag
+        RR_real_pregain = Ireal_pregain + Vreal_pregain
+        RR_imag_pregain = Iimag_pregain + Vimag_pregain
+        
+        LL_real_pregain = Ireal_pregain - Vreal_pregain
+        LL_imag_pregain = Iimag_pregain - Vimag_pregain
 
-        LL_real_pregain = Ireal - Vreal
-        LL_imag_pregain = Iimag - Vimag
+        RL_real_pregain = Qreal_pregain - Uimag_pregain
+        RL_imag_pregain = Qimag_pregain + Ureal_pregain
 
-        RL_real_pregain = Qreal - Uimag
-        RL_imag_pregain = Qimag + Ureal
-
-        LR_real_pregain = Qreal + Uimag
-        LR_imag_pregain = Qimag - Ureal
+        LR_real_pregain = Qreal_pregain + Uimag_pregain
+        LR_imag_pregain = Qimag_pregain - Ureal_pregain
 
         ###############################################
         # compute the corruption terms
@@ -867,6 +895,8 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
                  'ymin': ymin,
                  'ymax': ymax,
                  'fit_total_flux': fit_total_flux,
+                 'allow_offset': allow_offset,
+                 'offset_window': offset_window,
                  'total_flux_estimate': total_flux_estimate,
                  'ntuning': ntuning,
                  'ntrials': ntrials,
