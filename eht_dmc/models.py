@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 
 from . import data_utils as du
 from . import model_utils as mu
+from . import plotting as pl
 
 #######################################################
 # constants
@@ -934,17 +935,17 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
                 mu.save_model(modelinfo,dirname+'/modelinfo.p')
 
                 # save trace plots
-                dm.plotting.plot_trace(modelinfo)
+                pl.plot_trace(modelinfo)
                 plt.savefig(dirname+'/traceplots.png',dpi=300)
                 plt.close()
 
                 # HMC energy plot
-                energyplot = dm.plotting.plot_energy(modelinfo)
+                energyplot = pl.plot_energy(modelinfo)
                 plt.savefig(dirname+'/energyplot.png',dpi=300,bbox_inches='tight')
                 plt.close()
 
                 # plot HMC step size for main sampling run
-                stepplot = dm.plotting.plot_stepsize(modelinfo)
+                stepplot = pl.plot_stepsize(modelinfo)
                 plt.savefig(dirname+'/stepsize.png',dpi=300,bbox_inches='tight')
                 plt.close()
 
