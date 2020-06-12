@@ -953,7 +953,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
                 stepplot = plt.figure(figsize=(6,6))
                 ax = stepplot.add_axes([0.15,0.1,0.8,0.8])
                 steparr = list()
-                for ttrace in tuning_traces:
+                for ttrace in tuning_trace_list:
                     stepsize = ttrace.get_sampler_stats('step_size')
                     steparr.append(stepsize)
                 stepsize = burnin_trace.get_sampler_stats('step_size')
