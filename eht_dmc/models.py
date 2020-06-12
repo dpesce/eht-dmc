@@ -8,6 +8,9 @@ from __future__ import print_function
 import numpy as np
 import ehtim as eh
 import pymc3 as pm
+import pickle
+import os
+import matplotlib.pyplot as plt
 
 from . import data_utils as du
 from . import model_utils as mu
@@ -315,7 +318,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
           fit_StokesV=True,fit_total_flux=False,allow_offset=False,offset_window=200.0,
           smooth=None,n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,
           gain_amp_prior='normal',const_ref_RL=True,fit_gains=True,fit_smooth=False,
-          fit_syserr=True,**kwargs):
+          fit_syserr=True,tuning_windows=None,output_tuning=False,**kwargs):
     """ Fit a polarimetric image to a VLBI observation
 
        Args:
@@ -338,6 +341,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
            fit_smooth (bool): flag to fit for the smoothing kernel
            fit_syserr (bool): flag to fit for a multiplicative systematic error component
            allow_offset (bool): flag to permit image centroid to be a free parameter
+           output_tuning (bool): flag to output intermediate tuning chains
 
            n_start (int): initial number of default tuning steps
            n_burn (int): number of burn-in steps
@@ -345,6 +349,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
 
            ntuning (int): number of tuning steps to take during last leg
            ntrials (int): number of posterior samples to take
+           tuning_windows (list): sequence of tuning window lengths
            
        Returns:
            modelinfo: a dictionary containing the model fit information
@@ -368,6 +373,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
                                     'SP':0.07})
     max_treedepth = kwargs.get('max_treedepth',MAX_TREEDEPTH)
     early_max_treedepth = kwargs.get('early_max_treedepth',EARLY_MAX_TREEDEPTH)
+    output_tuning_dir = kwargs.get('output_tuning_dir','./tuning')
 
     ###################################################
     # data bookkeeping
@@ -862,7 +868,15 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
     # and could likely benefit from systematization
 
     # set up tuning windows
-    windows = n_start * (2**np.arange(np.floor(np.log2((n_tune - n_burn) / n_start))))
+    if tuning_windows is not None:
+        windows = np.array(tuning_windows)
+    else:
+        windows = n_start * (2**np.arange(np.floor(np.log2((n_tune - n_burn) / n_start))))
+
+    # make directory for saving intermediate output
+    if output_tuning:
+        if not os.path.exists(output_tuning_dir):
+            os.mkdir(output_tuning_dir)
 
     # keep track of the tuning runs
     tuning_trace_list = list()
@@ -873,9 +887,83 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
         # burn-in and initial mass matrix tuning
         for istep, steps in enumerate(windows):
             step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
-            burnin_trace = pm.sample(start=start, tune=steps, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
+            burnin_trace = pm.sample(draws=steps, start=start, tune=n_burn, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
             start = [t[-1] for t in burnin_trace._straces.values()]
             tuning_trace_list.append(burnin_trace)
+
+            # save intermediate output
+            if output_tuning:
+                
+                modelinfo = {'modeltype': 'polimage',
+                 'model': model,
+                 'trace': burnin_trace,
+                 'tuning_traces': tuning_trace_list,
+                 'nx': nx,
+                 'ny': ny,
+                 'xmin': xmin,
+                 'xmax': xmax,
+                 'ymin': ymin,
+                 'ymax': ymax,
+                 'fit_total_flux': fit_total_flux,
+                 'allow_offset': allow_offset,
+                 'offset_window': offset_window,
+                 'total_flux_estimate': total_flux_estimate,
+                 'ntuning': ntuning,
+                 'ntrials': ntrials,
+                 'RLequal': RLequal,
+                 'fit_StokesV': fit_StokesV,
+                 'obs': obs,
+                 'stations': stations,
+                 'T_gains': T_gains,
+                 'A_gains': A_gains,
+                 'smooth': smooth,
+                 'gain_amp_prior': gain_amp_prior,
+                 'fit_gains': fit_gains,
+                 'fit_smooth': fit_smooth,
+                 'fit_syserr': fit_syserr,
+                 'tuning_windows': tuning_windows,
+                 'output_tuning': output_tuning
+                 }
+
+                # make directory for this step
+                dirname = output_tuning_dir+'/step'+str(istep).zfill(5)
+                if not os.path.exists(dirname):
+                    os.mkdir(dirname)
+
+                # save modelinfo
+                mu.save_model(modelinfo,dirname+'/modelinfo.p')
+
+                # save trace plots
+                dm.plotting.plot_trace(modelinfo)
+                plt.savefig(dirname+'/traceplots.png',dpi=300)
+                plt.close()
+
+                # HMC energy plot
+                energyplot = dm.plotting.plot_energy(modelinfo)
+                plt.savefig(dirname+'/energyplot.png',dpi=300,bbox_inches='tight')
+                plt.close()
+
+                # plot HMC step size for main sampling run
+                stepplot = dm.plotting.plot_stepsize(modelinfo)
+                plt.savefig(dirname+'/stepsize.png',dpi=300,bbox_inches='tight')
+                plt.close()
+
+                # plot HMC step size for full run
+                stepplot = plt.figure(figsize=(6,6))
+                ax = stepplot.add_axes([0.15,0.1,0.8,0.8])
+                steparr = list()
+                for ttrace in tuning_traces:
+                    stepsize = ttrace.get_sampler_stats('step_size')
+                    steparr.append(stepsize)
+                stepsize = burnin_trace.get_sampler_stats('step_size')
+                steparr.append(stepsize)
+                steparr = np.concatenate(steparr)
+                ax.plot(steparr,'b-')
+                ax.semilogy()
+                ax.set_ylabel('Step size')
+                ax.set_xlabel('Trial number')
+                plt.savefig(dirname+'/stepsize_full.png',dpi=300,bbox_inches='tight')
+                plt.close()
 
         # posterior sampling
         step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
@@ -910,7 +998,9 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
                  'gain_amp_prior': gain_amp_prior,
                  'fit_gains': fit_gains,
                  'fit_smooth': fit_smooth,
-                 'fit_syserr': fit_syserr
+                 'fit_syserr': fit_syserr,
+                 'tuning_windows': tuning_windows,
+                 'output_tuning': output_tuning
                  }
 
     return modelinfo
