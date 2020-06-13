@@ -66,6 +66,9 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,loose_change=Fa
     ref_station = kwargs.get('ref_station','AA')
     regularize = kwargs.get('regularize',True)
 
+    max_treedepth = kwargs.get('max_treedepth',MAX_TREEDEPTH)
+    early_max_treedepth = kwargs.get('early_max_treedepth',EARLY_MAX_TREEDEPTH)
+
     ###################################################
     # data bookkeeping
 
@@ -277,13 +280,13 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,loose_change=Fa
 
         # burn-in and initial mass matrix tuning
         for istep, steps in enumerate(windows):
-            step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
+            step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth,regularize=regularize)
             burnin_trace = pm.sample(start=start, tune=steps, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
             start = [t[-1] for t in burnin_trace._straces.values()]
             tuning_trace_list.append(burnin_trace)
 
         # posterior sampling
-        step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
+        step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth,regularize=regularize)
         trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=start, chains=1, discard_tuned_samples=False)
 
     ###################################################
@@ -887,7 +890,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
 
         # burn-in and initial mass matrix tuning
         for istep, steps in enumerate(windows):
-            step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
+            step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth,regularize=regularize)
             burnin_trace = pm.sample(draws=steps, start=start, tune=n_burn, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
             start = [t[-1] for t in burnin_trace._straces.values()]
             tuning_trace_list.append(burnin_trace)
@@ -965,7 +968,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
                 plt.close()
 
         # posterior sampling
-        step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=MAX_TREEDEPTH,early_max_treedepth=EARLY_MAX_TREEDEPTH,regularize=regularize)
+        step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth,regularize=regularize)
         trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=start, chains=1, discard_tuned_samples=False)
 
     ###################################################
