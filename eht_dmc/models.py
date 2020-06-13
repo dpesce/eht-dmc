@@ -956,8 +956,6 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
                 for ttrace in tuning_trace_list:
                     stepsize = ttrace.get_sampler_stats('step_size')
                     steparr.append(stepsize)
-                stepsize = burnin_trace.get_sampler_stats('step_size')
-                steparr.append(stepsize)
                 steparr = np.concatenate(steparr)
                 ax.plot(steparr,'b-')
                 ax.semilogy()
