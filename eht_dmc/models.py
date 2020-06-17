@@ -318,7 +318,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,loose_change=Fa
 
     return modelinfo
 
-def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=False,
+def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,RLequal=False,
           fit_StokesV=True,fit_total_flux=False,allow_offset=False,offset_window=200.0,
           smooth=None,n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,
           gain_amp_prior='normal',const_ref_RL=True,fit_gains=True,fit_smooth=False,
@@ -334,6 +334,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
            ymin(float): minimum y pixel value (uas)
            ymax(float): maximum y pixel value (uas)
            
+           start (modelinfo): the DMC model info for a previous run from which to continue sampling
            total_flux_estimate (float): estimate of total Stokes I image flux (Jy)
            offset_window (float): width of square offset window (uas)
            smooth (float): smoothing kernel FWHM (uas)
@@ -885,14 +886,20 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
     # keep track of the tuning runs
     tuning_trace_list = list()
     with model:
-        start = None
-        burnin_trace = None
+        
+        # initialize using previous run if supplied
+        if start is not None:
+            burnin_trace = start['trace']
+            starting_values = [t[-1] for t in burnin_trace._straces.values()]
+        else:
+            burnin_trace = None
+            starting_values = None
 
         # burn-in and initial mass matrix tuning
         for istep, steps in enumerate(windows):
             step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth,regularize=regularize)
-            burnin_trace = pm.sample(draws=steps, start=start, tune=n_burn, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
-            start = [t[-1] for t in burnin_trace._straces.values()]
+            burnin_trace = pm.sample(draws=steps, start=starting_values, tune=n_burn, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
+            starting_values = [t[-1] for t in burnin_trace._straces.values()]
             tuning_trace_list.append(burnin_trace)
 
             # save intermediate output
@@ -969,7 +976,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,total_flux_estimate=None,RLequal=Fals
 
         # posterior sampling
         step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth,regularize=regularize)
-        trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=start, chains=1, discard_tuned_samples=False)
+        trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=starting_values, chains=1, discard_tuned_samples=False)
 
     ###################################################
     # package the model info
