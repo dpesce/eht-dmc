@@ -133,7 +133,7 @@ def gain_phase_prior(obs,ref_station='AA'):
 
     return gainphase_mu, gainphase_kappa
 
-def get_step_for_trace(trace=None, model=None, regularize=True, regular_window=5, regular_variance=1e-3, **kwargs):
+def get_step_for_trace(trace=None, model=None, diag=False, regularize=True, regular_window=5, regular_variance=1e-3, **kwargs):
     """ Define a tuning procedure that adapts off-diagonal mass matrix terms
         adapted from a blog post by Dan Foreman-Mackey here:
         https://dfm.io/posts/pymc3-mass-matrix/
@@ -142,6 +142,7 @@ def get_step_for_trace(trace=None, model=None, regularize=True, regular_window=5
            trace (trace): pymc3 trace object
            model (model): pymc3 model object
            
+           diag (bool): flag to tune only the diagonal elements
            regularize (bool): flag to turn on covariance matrix regularization
            regular_window (int): size of parameter space at which regularization becomes important
            regular_variance (float): magnitude of covariance floor
@@ -173,6 +174,8 @@ def get_step_for_trace(trace=None, model=None, regularize=True, regular_window=5
     
     # Compute the sample covariance
     cov = np.cov(samples, rowvar=0)
+    if diag:
+        cov = np.diag(cov)
     
     # Stan uses a regularized estimator for the covariance matrix to
     # be less sensitive to numerical issues for large parameter spaces.
