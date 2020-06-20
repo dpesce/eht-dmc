@@ -175,7 +175,7 @@ def get_step_for_trace(trace=None, model=None, diag=False, regularize=True, regu
     # Compute the sample covariance
     cov = np.cov(samples, rowvar=0)
     if diag:
-        cov = np.diag(cov)
+        cov = np.diag(np.diag(cov))
     
     # Stan uses a regularized estimator for the covariance matrix to
     # be less sensitive to numerical issues for large parameter spaces.
