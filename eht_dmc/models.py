@@ -322,7 +322,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
           fit_StokesV=True,fit_total_flux=False,allow_offset=False,offset_window=200.0,
           smooth=None,n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,
           gain_amp_prior='normal',const_ref_RL=True,fit_gains=True,fit_smooth=False,
-          fit_syserr=True,tuning_windows=None,output_tuning=False,**kwargs):
+          fit_syserr=True,syserr=None,tuning_windows=None,output_tuning=False,**kwargs):
     """ Fit a polarimetric image to a VLBI observation
 
        Args:
@@ -338,6 +338,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
            total_flux_estimate (float): estimate of total Stokes I image flux (Jy)
            offset_window (float): width of square offset window (uas)
            smooth (float): smoothing kernel FWHM (uas)
+           syserr (float): fractional systematic error
            
            RLequal (bool): flag to fix right and left gain terms to be equal
            fit_StokesV (bool): flag to fit for Stokes V; set to False to fix V = 0
@@ -555,7 +556,10 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
             # set the prior on the systematic error term to be uniform on [0,1]
             f = pm.Uniform('f',lower=0.0,upper=1.0)
         else:
-            f = 0.0
+            if syserr is not None:
+                f = syserr
+            else:
+                f = 0.0
 
         # permit a centroid shift in the image
         if allow_offset:
@@ -933,6 +937,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
                  'fit_gains': fit_gains,
                  'fit_smooth': fit_smooth,
                  'fit_syserr': fit_syserr,
+                 'syserr': syserr,
                  'tuning_windows': tuning_windows,
                  'output_tuning': output_tuning,
                  'diag': diag
