@@ -31,7 +31,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
           fit_total_flux=False,allow_offset=False,offset_window=200.0,n_start=25,n_burn=500,
           n_tune=5000,ntuning=2000,ntrials=10000,fit_smooth=False,smooth=None,fit_gains=True,
           fit_syserr=True,syserr=None,tuning_windows=None,output_tuning=False,
-          gain_amp_prior='log',**kwargs):
+          gain_amp_prior='normal',**kwargs):
     """ Fit a Stokes I image to a VLBI observation
 
        Args:
@@ -294,8 +294,9 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
             Ireal_err_model = pm.math.sqrt((I_real_err**2.0) + ((multiplicative*Itot_model)**2.0) + (additive**2.0))
             Iimag_err_model = pm.math.sqrt((I_imag_err**2.0) + ((multiplicative*Itot_model)**2.0) + (additive**2.0))
         else:
-            Ireal_err_model = pm.math.sqrt((I_real_err**2.0) + (f*F)**2.0)
-            Iimag_err_model = pm.math.sqrt((I_imag_err**2.0) + (f*F)**2.0)
+            Itot_model = pm.math.sqrt((Ireal_model**2.0) + (Iimag_model**2.0))
+            Ireal_err_model = pm.math.sqrt((I_real_err**2.0) + (f*Itot_model)**2.0)
+            Iimag_err_model = pm.math.sqrt((I_imag_err**2.0) + (f*Itot_model)**2.0)
 
         ###############################################
         # define the likelihood
@@ -420,32 +421,6 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
         step = mu.get_step_for_trace(burnin_trace,regularize=regularize,diag=diag,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth)
         trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=starting_values, chains=1, discard_tuned_samples=False)
 
-    # ###################################################
-    # # fit the model
-
-    # # NOTE: the current tuning scheme is rather arbitrary
-    # # and could likely benefit from systematization
-
-    # # set up tuning windows
-    # windows = n_start * (2**np.arange(np.floor(np.log2((n_tune - n_burn) / n_start))))
-
-    # # keep track of the tuning runs
-    # tuning_trace_list = list()
-    # with model:
-    #     start = None
-    #     burnin_trace = None
-
-    #     # burn-in and initial mass matrix tuning
-    #     for istep, steps in enumerate(windows):
-    #         step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth,regularize=regularize)
-    #         burnin_trace = pm.sample(start=start, tune=steps, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
-    #         start = [t[-1] for t in burnin_trace._straces.values()]
-    #         tuning_trace_list.append(burnin_trace)
-
-    #     # posterior sampling
-    #     step = mu.get_step_for_trace(burnin_trace,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth,regularize=regularize)
-    #     trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=start, chains=1, discard_tuned_samples=False)
-
     ###################################################
     # package the model info
 
@@ -488,8 +463,9 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
 def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,RLequal=False,
           fit_StokesV=True,fit_total_flux=False,allow_offset=False,offset_window=200.0,
           smooth=None,n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,
-          gain_amp_prior='normal',const_ref_RL=True,fit_gains=True,fit_smooth=False,
-          fit_syserr=True,syserr=None,tuning_windows=None,output_tuning=False,**kwargs):
+          gain_amp_prior='normal',const_ref_RL=True,fit_gains=True,fit_leakages=True,
+          fit_smooth=False,fit_syserr=True,syserr=None,tuning_windows=None,output_tuning=False,
+          **kwargs):
     """ Fit a polarimetric image to a VLBI observation
 
        Args:
@@ -511,6 +487,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
            fit_StokesV (bool): flag to fit for Stokes V; set to False to fix V = 0
            fit_total_flux (bool): flag to fit for the total flux
            fit_gains (bool): flag to fit for the complex gains
+           fit_leakages (bool): flag to fit for the complex leakages
            fit_smooth (bool): flag to fit for the smoothing kernel
            fit_syserr (bool): flag to fit for a multiplicative systematic error component
            allow_offset (bool): flag to permit image centroid to be a free parameter
@@ -784,22 +761,24 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
         ###############################################
         # set the priors for the leakage parameters
         
-        # set the D term amplitude priors to be uniform on [0,1]
-        Damp_R = pm.Uniform('right_Dterm_amps',lower=0.0,upper=1.0,shape=N_Dterms,testval=0.01)
-        logDamp_R = pm.math.log(Damp_R)
+        if fit_leakages:
 
-        Damp_L = pm.Uniform('left_Dterm_amps',lower=0.0,upper=1.0,shape=N_Dterms,testval=0.01)
-        logDamp_L = pm.math.log(Damp_L)
+            # set the D term amplitude priors to be uniform on [0,1]
+            Damp_R = pm.Uniform('right_Dterm_amps',lower=0.0,upper=1.0,shape=N_Dterms,testval=0.01)
+            logDamp_R = pm.math.log(Damp_R)
 
-        # set the D term phase priors to be periodic uniform on (-pi,pi)
-        delta_R = pm.VonMises('right_Dterm_phases',mu=0.0,kappa=0.0001,shape=N_Dterms)
-        delta_L = pm.VonMises('left_Dterm_phases',mu=0.0,kappa=0.0001,shape=N_Dterms)
+            Damp_L = pm.Uniform('left_Dterm_amps',lower=0.0,upper=1.0,shape=N_Dterms,testval=0.01)
+            logDamp_L = pm.math.log(Damp_L)
 
-        # save the real and imaginary parts for output diagnostics
-        D_R_real = pm.Deterministic('right_Dterm_reals',Damp_R*pm.math.cos(delta_R))
-        D_R_imag = pm.Deterministic('right_Dterm_imags',Damp_R*pm.math.sin(delta_R))
-        D_L_real = pm.Deterministic('left_Dterm_reals',Damp_L*pm.math.cos(delta_L))
-        D_L_imag = pm.Deterministic('left_Dterm_imags',Damp_L*pm.math.sin(delta_L))
+            # set the D term phase priors to be periodic uniform on (-pi,pi)
+            delta_R = pm.VonMises('right_Dterm_phases',mu=0.0,kappa=0.0001,shape=N_Dterms)
+            delta_L = pm.VonMises('left_Dterm_phases',mu=0.0,kappa=0.0001,shape=N_Dterms)
+
+            # save the real and imaginary parts for output diagnostics
+            D_R_real = pm.Deterministic('right_Dterm_reals',Damp_R*pm.math.cos(delta_R))
+            D_R_imag = pm.Deterministic('right_Dterm_imags',Damp_R*pm.math.sin(delta_R))
+            D_L_real = pm.Deterministic('left_Dterm_reals',Damp_L*pm.math.cos(delta_L))
+            D_L_imag = pm.Deterministic('left_Dterm_imags',Damp_L*pm.math.sin(delta_L))
 
         ###############################################
         # compute the polarized Stokes parameters
@@ -908,16 +887,28 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
             gainphase_L1 = 0.0
             gainphase_L2 = 0.0
         
-        Damp_R1 = pm.math.exp(pm.math.dot(dterm_design_mat_1,logDamp_R))
-        Damp_R2 = pm.math.exp(pm.math.dot(dterm_design_mat_2,logDamp_R))
-        Damp_L1 = pm.math.exp(pm.math.dot(dterm_design_mat_1,logDamp_L))
-        Damp_L2 = pm.math.exp(pm.math.dot(dterm_design_mat_2,logDamp_L))
-        
-        Dphase_R1_preFR = pm.math.dot(dterm_design_mat_1,delta_R)
-        Dphase_R2_preFR = pm.math.dot(dterm_design_mat_2,delta_R)
-        Dphase_L1_preFR = pm.math.dot(dterm_design_mat_1,delta_L)
-        Dphase_L2_preFR = pm.math.dot(dterm_design_mat_2,delta_L)
-        
+        if fit_leakages:
+            Damp_R1 = pm.math.exp(pm.math.dot(dterm_design_mat_1,logDamp_R))
+            Damp_R2 = pm.math.exp(pm.math.dot(dterm_design_mat_2,logDamp_R))
+            Damp_L1 = pm.math.exp(pm.math.dot(dterm_design_mat_1,logDamp_L))
+            Damp_L2 = pm.math.exp(pm.math.dot(dterm_design_mat_2,logDamp_L))
+            
+            Dphase_R1_preFR = pm.math.dot(dterm_design_mat_1,delta_R)
+            Dphase_R2_preFR = pm.math.dot(dterm_design_mat_2,delta_R)
+            Dphase_L1_preFR = pm.math.dot(dterm_design_mat_1,delta_L)
+            Dphase_L2_preFR = pm.math.dot(dterm_design_mat_2,delta_L)
+
+        else:
+            Damp_R1 = 1.0
+            Damp_R2 = 1.0
+            Damp_L1 = 1.0
+            Damp_L2 = 1.0
+            
+            Dphase_R1_preFR = 0.0
+            Dphase_R2_preFR = 0.0
+            Dphase_L1_preFR = 0.0
+            Dphase_L2_preFR = 0.0
+            
         Dphase_R1 = Dphase_R1_preFR + FR1
         Dphase_R2 = Dphase_R2_preFR + FR2
         Dphase_L1 = Dphase_L1_preFR - FR1
@@ -1099,6 +1090,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
                  'smooth': smooth,
                  'gain_amp_prior': gain_amp_prior,
                  'fit_gains': fit_gains,
+                 'fit_leakages': fit_leakages,
                  'fit_smooth': fit_smooth,
                  'fit_syserr': fit_syserr,
                  'syserr': syserr,
@@ -1177,6 +1169,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
                  'smooth': smooth,
                  'gain_amp_prior': gain_amp_prior,
                  'fit_gains': fit_gains,
+                 'fit_leakages': fit_leakages,
                  'fit_smooth': fit_smooth,
                  'fit_syserr': fit_syserr,
                  'tuning_windows': tuning_windows,
