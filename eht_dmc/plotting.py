@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import ehtplot
 import corner
 import os
+from tqdm import tqdm
 
 from . import model_utils as mu
 
@@ -36,14 +37,19 @@ def plot_trace(modelinfo,**kwargs):
 
     return traceplot
 
-def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
+def plot_image(modelinfo,imtype='I',moment='mean',nx=100,ny=100,fov_scale=1.5,burnin=0,nsamps=None,title=None):
     """ Plot image
 
        Args:
            modelinfo (dict): dmc modelinfo dictionary
-           imtype (str): the type of image to plot; choices are I, Q, U, V, p, EVPA
-           moment (str): the type of posterior moment to plot; choices are mean, median, std, snr
+
+           imtype (str): the type of image to plot; choices are I, Q, U, V
+           moment (str): the type of posterior moment to plot; choices are mean, std
+           nx (int): number of image pixels in the x-direction
+           ny (int): number of image pixels in the y-direction
+           fov_scale (float): factor by which to increase the model FOV when making the image
            burnin (int): length of burn-in
+           nsamps (int): number of chain samples to use when making the image
            title (str): plot title
            
        Returns:
@@ -53,9 +59,9 @@ def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
 
     if modelinfo['modeltype'] not in ['image','polimage']:
         raise Exception('modeltype is not image or polimage!')
-    if imtype not in ['I','Q','U','V','p','EVPA']:
+    if imtype not in ['I','Q','U','V']:
         raise Exception('imtype ' + imtype + ' not recognized!')
-    if moment not in ['mean','median','std','snr']:
+    if moment not in ['mean','std']:
         raise Exception('moment ' + moment + ' not recognized!')
     if (modelinfo['modeltype'] == 'image') & (imtype != 'I'):
         raise Exception('modeltype image does not contain '+imtype+'!')
@@ -63,34 +69,50 @@ def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
     ###################################################
     # organizing image information
 
-    nx = modelinfo['nx']
-    ny = modelinfo['ny']
+    nx_input = modelinfo['nx']
+    ny_input = modelinfo['ny']
     xmin = modelinfo['xmin']
     xmax = modelinfo['xmax']
     ymin = modelinfo['ymin']
     ymax = modelinfo['ymax']
+    smooth = modelinfo['smooth']
+    fit_smooth = modelinfo['fit_smooth']
     
-    # total number of pixels
-    npix = nx*ny
+    fullwidth_x = xmax - xmin
+    pix_size_x = fullwidth_x / (nx-1)
+    fov_x = nx*pix_size_x
+
+    fullwidth_y = ymax - ymin
+    pix_size_y = fullwidth_y / (ny-1)
+    fov_y = ny*pix_size_y
+
+    if ((smooth != None) & (fit_smooth == False)):
+        sigma = smooth / (2.0*np.sqrt(2.0*np.log(2.0)))
     
-    # one-dimensional pixel vectors
-    x_1d = np.linspace(xmin,xmax,nx)
-    y_1d = np.linspace(ymin,ymax,ny)
+    # one-dimensional pixel vectors for the model
+    x_1d = np.linspace(xmin,xmax,nx_input)
+    y_1d = np.linspace(ymin,ymax,ny_input)
     
-    # two-dimensional pixel vectors
-    x2d, y2d = np.meshgrid(x_1d,y_1d,indexing='ij')
-    
-    # convert from microarcseconds to radians
-    x = eh.RADPERUAS*x2d.ravel()
-    y = eh.RADPERUAS*y2d.ravel()
-    
+    # one-dimensional pixel vectors for the image
+    xim_1d = np.linspace(fov_scale*xmin,fov_scale*xmax,nx)
+    yim_1d = np.linspace(fov_scale*ymin,fov_scale*ymax,ny)
+
+    # two-dimensional pixel vectors for the image
+    xim_2d, yim_2d = np.meshgrid(xim_1d,yim_1d,indexing='ij')
+    x = xim_2d.ravel()
+    y = yim_2d.ravel()
+
     # make edge arrays
-    xspacing = np.mean(x_1d[1:]-x_1d[0:-1])
-    x_edges_1d = np.append(x_1d,x_1d[-1]+xspacing) - (xspacing/2.0)
-    yspacing = np.mean(y_1d[1:]-y_1d[0:-1])
-    y_edges_1d = np.append(y_1d,y_1d[-1]+yspacing) - (yspacing/2.0)
+    xspacing = np.mean(xim_1d[1:]-xim_1d[0:-1])
+    x_edges_1d = np.append(xim_1d,xim_1d[-1]+xspacing) - (xspacing/2.0)
+    yspacing = np.mean(yim_1d[1:]-yim_1d[0:-1])
+    y_edges_1d = np.append(yim_1d,yim_1d[-1]+yspacing) - (yspacing/2.0)
     x_edges, y_edges = np.meshgrid(x_edges_1d,y_edges_1d,indexing='ij')
-    
+
+    # pixel size for the image
+    psize_x_im = fov_scale*(xmax-xmin)/(nx-1)
+    psize_y_im = fov_scale*(ymax-ymin)/(ny-1)
+
     ###################################################
     # organize chain info and compute image moment
     
@@ -103,15 +125,84 @@ def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
     div_mask = np.invert(trace[burnin:].diverging)
     imvec = imvec[div_mask]
 
+    # initialize image vector
+    im = np.zeros(nx*ny)
+
+    # loop over samples
+    if (nsamps is not None):
+        print('Computing mean using '+str(nsamps)+' samples from the chain...')
+        for i in tqdm(range(nsamps)):
+
+            index = np.random.randint(len(imvec))
+            imvec_here = imvec[index].reshape((nx_input,ny_input))
+
+            # loop over modeled pixels
+            for ix in range(len(x_1d)):
+                for iy in range(len(y_1d)):
+                    im += (imvec_here[ix,iy]/(2.0*np.pi*(sigma/psize_x_im)*(sigma/psize_y_im)))*np.exp(-((((x-x_1d[ix])**2.0) + ((y-y_1d[iy])**2.0)) / (2.0*(sigma**2.0))))
+
+        # get average
+        im /= float(nsamps)
+
+    # if number of samples isn't specified, loop over the entire chain
+    else:
+        print('Warning: nsamps is not specified; computing mean over the entire chain!')
+        for i in tqdm(range(len(imvec))):
+
+            imvec_here = imvec[i].reshape((nx_input,ny_input))
+
+            # loop over modeled pixels
+            for ix in range(len(x_1d)):
+                for iy in range(len(y_1d)):
+                    im += (imvec_here[ix,iy]/(2.0*np.pi*(sigma/psize_x_im)*(sigma/psize_y_im)))*np.exp(-((((x-x_1d[ix])**2.0) + ((y-y_1d[iy])**2.0)) / (2.0*(sigma**2.0))))
+
+        # get average
+        im /= float(len(imvec))
+
+    # compute standard deviation
+    if (moment == 'std'):
+        im_avg = np.copy(im)
+
+        # initialize image vector
+        im = np.zeros(nx*ny)
+
+        # loop over samples
+        if (nsamps is not None):
+            print('Computing standard deviation using '+str(nsamps)+' samples from the chain...')
+            for i in tqdm(range(nsamps)):
+
+                index = np.random.randint(len(imvec))
+                imvec_here = imvec[index].reshape((nx_input,ny_input))
+
+                # loop over modeled pixels
+                imhere = np.zeros(nx*ny)
+                for ix in range(len(x_1d)):
+                    for iy in range(len(y_1d)):
+                        imhere += (imvec_here[ix,iy]/(2.0*np.pi*(sigma/psize_x_im)*(sigma/psize_y_im)))*np.exp(-((((x-x_1d[ix])**2.0) + ((y-y_1d[iy])**2.0)) / (2.0*(sigma**2.0))))
+                im += (imhere - im_avg)**2.0
+
+            # get standard deviation
+            im = np.sqrt(im/float(nsamps))
+
+        # if number of samples isn't specified, loop over the entire chain
+        else:
+            print('Warning: nsamps is not specified; computing standard deviation over the entire chain!')
+            for i in tqdm(range(len(imvec))):
+
+                imvec_here = imvec[i].reshape((nx_input,ny_input))
+
+                # loop over modeled pixels
+                imhere = np.zeros(nx*ny)
+                for ix in range(len(x_1d)):
+                    for iy in range(len(y_1d)):
+                        imhere += (imvec_here[ix,iy]/(2.0*np.pi*(sigma/psize_x_im)*(sigma/psize_y_im)))*np.exp(-((((x-x_1d[ix])**2.0) + ((y-y_1d[iy])**2.0)) / (2.0*(sigma**2.0))))
+                im += (imhere - im_avg)**2.0
+
+            # get average
+            im = np.sqrt(im/float(len(imvec)))
+
     # reshape array
-    if moment == 'mean':
-        im = np.mean(imvec,axis=0).reshape((nx,ny))
-    elif moment == 'median':
-        im = np.median(imvec,axis=0).reshape((nx,ny))
-    elif moment == 'std':
-        im = np.std(imvec,axis=0).reshape((nx,ny))
-    elif moment == 'snr':
-        im = np.mean(imvec,axis=0).reshape((nx,ny)) / np.std(imvec,axis=0).reshape((nx,ny))
+    im = im.reshape((nx,ny))
 
     ###################################################
     # create figure
@@ -119,7 +210,7 @@ def plot_image(modelinfo,imtype,moment,burnin=0,title=None):
     imageplot = plt.figure(figsize=(6,5))
     ax = imageplot.add_axes([0.1,0.1,0.75,0.75])
 
-    if imtype in ['I','p']:
+    if (imtype == 'I'):
         vmin = 0
         vmax = np.max(im)
         implot = ax.pcolormesh(x_edges,y_edges,im,vmin=vmin,vmax=vmax,cmap='afmhot_us')
