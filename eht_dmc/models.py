@@ -177,7 +177,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
         if fit_total_flux:
             # set to be normal around the correct value, but bounded positive
             BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
-            F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate)
+            F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate,testval=total_flux_estimate)
         else:
             # fix at input value
             F = total_flux_estimate
@@ -190,15 +190,15 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
         # systematic noise prescription
         if loose_change:
             # set the prior on the multiplicative systematic error term to be uniform on [0,1]
-            multiplicative = pm.Uniform('multiplicative',lower=0.0,upper=1.0)
+            multiplicative = pm.Uniform('multiplicative',lower=0.0,upper=1.0,testval=0.01)
 
             # set the prior on the additive systematic error term to be uniform on [0,1] Jy
-            additive = pm.Uniform('additive',lower=0.0,upper=1.0)
+            additive = pm.Uniform('additive',lower=0.0,upper=1.0,testval=0.001)
 
         else:
             if fit_syserr:
                 # set the prior on the systematic error term to be uniform on [0,1]
-                f = pm.Uniform('f',lower=0.0,upper=1.0)
+                f = pm.Uniform('f',lower=0.0,upper=1.0,testval=0.01)
             else:
                 if syserr is not None:
                     f = syserr
@@ -670,7 +670,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
         if fit_total_flux:
             # set to be normal around the correct value, but bounded positive
             BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
-            F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate)
+            F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate,testval=total_flux_estimate)
         else:
             # fix at input value
             F = total_flux_estimate
@@ -698,7 +698,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
 
         if fit_syserr:
             # set the prior on the systematic error term to be uniform on [0,1]
-            f = pm.Uniform('f',lower=0.0,upper=1.0)
+            f = pm.Uniform('f',lower=0.0,upper=1.0,testval=0.01)
         else:
             if syserr is not None:
                 f = syserr
