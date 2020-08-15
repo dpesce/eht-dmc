@@ -899,10 +899,10 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
             Dphase_L2_preFR = pm.math.dot(dterm_design_mat_2,delta_L)
 
         else:
-            Damp_R1 = 1.0
-            Damp_R2 = 1.0
-            Damp_L1 = 1.0
-            Damp_L2 = 1.0
+            Damp_R1 = 0.0
+            Damp_R2 = 0.0
+            Damp_L1 = 0.0
+            Damp_L2 = 0.0
             
             Dphase_R1_preFR = 0.0
             Dphase_R2_preFR = 0.0
