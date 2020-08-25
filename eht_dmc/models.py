@@ -31,7 +31,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
           fit_total_flux=False,allow_offset=False,offset_window=200.0,n_start=25,n_burn=500,
           n_tune=5000,ntuning=2000,ntrials=10000,fit_smooth=False,smooth=None,fit_gains=True,
           fit_syserr=True,syserr=None,tuning_windows=None,output_tuning=False,
-          gain_amp_prior='normal',**kwargs):
+          gain_amp_prior='normal',dirichlet_weight=1.0,**kwargs):
     """ Fit a Stokes I image to a VLBI observation
 
        Args:
@@ -62,6 +62,8 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
            ntuning (int): number of tuning steps to take during last leg
            ntrials (int): number of posterior samples to take
            tuning_windows (list): sequence of tuning window lengths
+
+           dirichlet_weight (float): Dirichlet concentration parameter; 1 = flat; <1 = sparse; >1 = smooth
            
        Returns:
            modelinfo: a dictionary object containing the model fit information
@@ -158,7 +160,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
     gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,ref_station=ref_station)
     
     # specify the Dirichlet weights; 1 = flat; <1 = sparse; >1 = smooth
-    dirichlet_weights = 1.0*np.ones_like(x)
+    dirichlet_weights = dirichlet_weight*np.ones_like(x)
 
     ###################################################
     # setting up the model
@@ -376,7 +378,8 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
                  'syserr': syserr,
                  'tuning_windows': tuning_windows,
                  'output_tuning': output_tuning,
-                 'diag': diag
+                 'diag': diag,
+                 'dirichlet_weight': dirichlet_weight
                  }
 
                 # make directory for this step
@@ -455,7 +458,8 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
                  'syserr': syserr,
                  'tuning_windows': tuning_windows,
                  'output_tuning': output_tuning,
-                 'diag': diag
+                 'diag': diag,
+                 'dirichlet_weight': dirichlet_weight
                  }
 
     return modelinfo
@@ -465,7 +469,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
           smooth=None,n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,
           gain_amp_prior='normal',const_ref_RL=True,fit_gains=True,fit_leakages=True,
           fit_smooth=False,fit_syserr=True,syserr=None,tuning_windows=None,output_tuning=False,
-          **kwargs):
+          dirichlet_weight=1.0,**kwargs):
     """ Fit a polarimetric image to a VLBI observation
 
        Args:
@@ -500,6 +504,8 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
            ntuning (int): number of tuning steps to take during last leg
            ntrials (int): number of posterior samples to take
            tuning_windows (list): sequence of tuning window lengths
+
+           dirichlet_weight (float): Dirichlet concentration parameter; 1 = flat; <1 = sparse; >1 = smooth
            
        Returns:
            modelinfo: a dictionary containing the model fit information
@@ -650,7 +656,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
             gainphase_kappa_L[ind_ref] = gainphase_kappa_temp
 
     # specify the Dirichlet weights; 1 = flat; <1 = sparse; >1 = smooth
-    dirichlet_weights = 1.0*np.ones_like(x)
+    dirichlet_weights = dirichlet_weight*np.ones_like(x)
 
     ###################################################
     # setting up the model
@@ -1096,7 +1102,8 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
                  'syserr': syserr,
                  'tuning_windows': tuning_windows,
                  'output_tuning': output_tuning,
-                 'diag': diag
+                 'diag': diag,
+                 'dirichlet_weight': dirichlet_weight
                  }
 
                 # make directory for this step
@@ -1174,7 +1181,8 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
                  'fit_syserr': fit_syserr,
                  'tuning_windows': tuning_windows,
                  'output_tuning': output_tuning,
-                 'diag': diag
+                 'diag': diag,
+                 'dirichlet_weight': dirichlet_weight
                  }
 
     return modelinfo
