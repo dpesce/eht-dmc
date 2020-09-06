@@ -159,8 +159,9 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
     # prior info for gain phases
     gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,ref_station=ref_station)
     
-    # specify the Dirichlet weights; 1 = flat; <1 = sparse; >1 = smooth
-    dirichlet_weights = dirichlet_weight*np.ones_like(x)
+    if (dirichlet_weight != None):
+        # specify the Dirichlet weights; 1 = flat; <1 = sparse; >1 = smooth
+        dirichlet_weights = dirichlet_weight*np.ones_like(x)
 
     ###################################################
     # setting up the model
@@ -184,10 +185,14 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
             # fix at input value
             F = total_flux_estimate
 
-        # Impose a Dirichlet prior on the pixel intensities,
-        # with summation constraint equal to the total flux
-        pix = pm.Dirichlet('pix',dirichlet_weights)
-        I = pm.Deterministic('I',pix*F)
+        if (dirichlet_weight != None):
+            # Impose a Dirichlet prior on the pixel intensities,
+            # with summation constraint equal to the total flux
+            pix = pm.Dirichlet('pix',dirichlet_weights)
+            I = pm.Deterministic('I',pix*F)
+        else:
+            pix = pm.Uniform('pix',lower=0.0,upper=1.0,shape=npix)
+            I = pm.Deterministic('I',(pix/pm.math.sum(pix))*F)
 
         # systematic noise prescription
         if loose_change:
@@ -655,8 +660,9 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
             gainphase_kappa_temp[0] = 10000.0
             gainphase_kappa_L[ind_ref] = gainphase_kappa_temp
 
-    # specify the Dirichlet weights; 1 = flat; <1 = sparse; >1 = smooth
-    dirichlet_weights = dirichlet_weight*np.ones_like(x)
+    if (dirichlet_weight != None):
+        # specify the Dirichlet weights; 1 = flat; <1 = sparse; >1 = smooth
+        dirichlet_weights = dirichlet_weight*np.ones_like(x)
 
     ###################################################
     # setting up the model
@@ -681,10 +687,14 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
             # fix at input value
             F = total_flux_estimate
 
-        # Impose a Dirichlet prior on the pixel Stokes I intensities,
-        # with summation constraint equal to the total flux
-        pix = pm.Dirichlet('pix',dirichlet_weights)
-        I = pm.Deterministic('I',pix*F)
+        if (dirichlet_weight != None):
+            # Impose a Dirichlet prior on the pixel intensities,
+            # with summation constraint equal to the total flux
+            pix = pm.Dirichlet('pix',dirichlet_weights)
+            I = pm.Deterministic('I',pix*F)
+        else:
+            pix = pm.Uniform('pix',lower=0.0,upper=1.0,shape=npix)
+            I = pm.Deterministic('I',(pix/pm.math.sum(pix))*F)
         
         # sample the polarization fraction uniformly on [0,1]
         p = pm.Uniform('p',lower=0.0,upper=1.0,shape=npix)
