@@ -695,7 +695,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
                 I = pm.Deterministic('I',pix*F)
             else:
                 a = pm.Uniform('a',lower=0.0,upper=2.0,shape=1)
-                pix = pm.Dirichlet('pix',a=a*np.ones_like(x))
+                pix = pm.Dirichlet('pix',a=a*np.ones_like(x),shape=npix)
                 I = pm.Deterministic('I',pix*F)
         else:
             pix = pm.Uniform('pix',lower=0.0,upper=1.0,shape=npix)
