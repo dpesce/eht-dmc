@@ -615,13 +615,13 @@ def make_image2(modelinfo,moment='mean',nx=100,ny=100,fov_scale=1.5,burnin=0,nsa
     smooth = modelinfo['smooth']
     fit_smooth = modelinfo['fit_smooth']
     
-    fullwidth_x = xmax - xmin
-    pix_size_x = fullwidth_x / (nx-1)
-    fov_x = nx*pix_size_x
+    # fullwidth_x = xmax - xmin
+    # pix_size_x = fullwidth_x / float(nx-1)
+    # fov_x = nx*pix_size_x
 
-    fullwidth_y = ymax - ymin
-    pix_size_y = fullwidth_y / (ny-1)
-    fov_y = ny*pix_size_y
+    # fullwidth_y = ymax - ymin
+    # pix_size_y = fullwidth_y / float(ny-1)
+    # fov_y = ny*pix_size_y
 
     if ((smooth != None) & (fit_smooth == False)):
         sigma = smooth / (2.0*np.sqrt(2.0*np.log(2.0)))
@@ -631,8 +631,17 @@ def make_image2(modelinfo,moment='mean',nx=100,ny=100,fov_scale=1.5,burnin=0,nsa
     y_1d = np.linspace(ymin,ymax,ny_input)
     
     # one-dimensional pixel vectors for the image
-    xim_1d = np.linspace(fov_scale*xmin,fov_scale*xmax,nx)
-    yim_1d = np.linspace(fov_scale*ymin,fov_scale*ymax,ny)
+    fov_imx = fov_scale*FOVx
+    fov_imy = fov_scale*FOVy
+    psize_imx = fov_imx / float(nx)
+    psize_imy = fov_imy / float(ny)
+    xmin_im = x0 - ((fov_imx-psize_imx)/2.0)
+    xmax_im = x0 + ((fov_imx-psize_imx)/2.0)
+    ymin_im = y0 - ((fov_imy-psize_imy)/2.0)
+    ymax_im = y0 + ((fov_imy-psize_imy)/2.0)
+
+    xim_1d = np.linspace(xmin_im,xmax_im,nx)
+    yim_1d = np.linspace(ymin_im,ymax_im,ny)
 
     # two-dimensional pixel vectors for the image
     xim_2d, yim_2d = np.meshgrid(xim_1d,yim_1d,indexing='ij')
