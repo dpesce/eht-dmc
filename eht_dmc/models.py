@@ -31,7 +31,7 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
           fit_total_flux=False,allow_offset=False,offset_window=200.0,n_start=25,n_burn=500,
           n_tune=5000,ntuning=2000,ntrials=10000,fit_smooth=False,smooth=None,fit_gains=True,
           fit_syserr=True,syserr=None,tuning_windows=None,output_tuning=False,
-          gain_amp_prior='normal',dirichlet_weight=1.0,**kwargs):
+          gain_amp_prior='normal',dirichlet_weight=1.0,fit_dirichlet_weight=False,**kwargs):
     """ Fit a Stokes I image to a VLBI observation
 
        Args:
@@ -188,8 +188,13 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
         if (dirichlet_weight != None):
             # Impose a Dirichlet prior on the pixel intensities,
             # with summation constraint equal to the total flux
-            pix = pm.Dirichlet('pix',dirichlet_weights)
-            I = pm.Deterministic('I',pix*F)
+            if fit_dirichlet_weight == False:
+                pix = pm.Dirichlet('pix',dirichlet_weights)
+                I = pm.Deterministic('I',pix*F)
+            else:
+                a = pm.Uniform('a',lower=0.0,upper=2.0,shape=1)
+                pix = pm.Dirichlet('pix',a=a*np.ones_like(x),shape=npix)
+                I = pm.Deterministic('I',pix*F)
         else:
             pix = pm.Uniform('pix',lower=0.0,upper=1.0,shape=npix)
             I = pm.Deterministic('I',(pix/pm.math.sum(pix))*F)
@@ -384,7 +389,8 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
                  'tuning_windows': tuning_windows,
                  'output_tuning': output_tuning,
                  'diag': diag,
-                 'dirichlet_weight': dirichlet_weight
+                 'dirichlet_weight': dirichlet_weight,
+                 'fit_dirichlet_weight': fit_dirichlet_weight
                  }
 
                 # make directory for this step
@@ -464,7 +470,8 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
                  'tuning_windows': tuning_windows,
                  'output_tuning': output_tuning,
                  'diag': diag,
-                 'dirichlet_weight': dirichlet_weight
+                 'dirichlet_weight': dirichlet_weight,
+                 'fit_dirichlet_weight': fit_dirichlet_weight
                  }
 
     return modelinfo
@@ -474,7 +481,7 @@ def image2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=None
           fit_total_flux=False,allow_offset=False,offset_window=200.0,n_start=25,n_burn=500,
           n_tune=5000,ntuning=2000,ntrials=10000,fit_smooth=False,smooth=None,fit_gains=True,
           fit_syserr=True,syserr=None,tuning_windows=None,output_tuning=False,
-          gain_amp_prior='normal',dirichlet_weight=1.0,**kwargs):
+          gain_amp_prior='normal',dirichlet_weight=1.0,fit_dirichlet_weight=False,**kwargs):
     """ Fit a Stokes I image to a VLBI observation
 
        Args:
@@ -639,8 +646,13 @@ def image2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=None
         if (dirichlet_weight != None):
             # Impose a Dirichlet prior on the pixel intensities,
             # with summation constraint equal to the total flux
-            pix = pm.Dirichlet('pix',dirichlet_weights)
-            I = pm.Deterministic('I',pix*F)
+            if fit_dirichlet_weight == False:
+                pix = pm.Dirichlet('pix',dirichlet_weights)
+                I = pm.Deterministic('I',pix*F)
+            else:
+                a = pm.Uniform('a',lower=0.0,upper=2.0,shape=1)
+                pix = pm.Dirichlet('pix',a=a*np.ones_like(x),shape=npix)
+                I = pm.Deterministic('I',pix*F)
         else:
             pix = pm.Uniform('pix',lower=0.0,upper=1.0,shape=npix)
             I = pm.Deterministic('I',(pix/pm.math.sum(pix))*F)
@@ -835,7 +847,8 @@ def image2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=None
                  'tuning_windows': tuning_windows,
                  'output_tuning': output_tuning,
                  'diag': diag,
-                 'dirichlet_weight': dirichlet_weight
+                 'dirichlet_weight': dirichlet_weight,
+                 'fit_dirichlet_weight': fit_dirichlet_weight
                  }
 
                 # make directory for this step
@@ -915,7 +928,8 @@ def image2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=None
                  'tuning_windows': tuning_windows,
                  'output_tuning': output_tuning,
                  'diag': diag,
-                 'dirichlet_weight': dirichlet_weight
+                 'dirichlet_weight': dirichlet_weight,
+                 'fit_dirichlet_weight': fit_dirichlet_weight
                  }
 
     return modelinfo
