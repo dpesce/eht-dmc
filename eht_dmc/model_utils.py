@@ -614,14 +614,6 @@ def make_image2(modelinfo,moment='mean',nx=100,ny=100,fov_scale=1.5,burnin=0,nsa
 
     smooth = modelinfo['smooth']
     fit_smooth = modelinfo['fit_smooth']
-    
-    # fullwidth_x = xmax - xmin
-    # pix_size_x = fullwidth_x / float(nx-1)
-    # fov_x = nx*pix_size_x
-
-    # fullwidth_y = ymax - ymin
-    # pix_size_y = fullwidth_y / float(ny-1)
-    # fov_y = ny*pix_size_y
 
     if ((smooth != None) & (fit_smooth == False)):
         sigma = smooth / (2.0*np.sqrt(2.0*np.log(2.0)))

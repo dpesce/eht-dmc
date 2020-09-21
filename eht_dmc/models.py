@@ -668,8 +668,8 @@ def image2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=None
             x0_model = eh.RADPERUAS*pm.Uniform('x0',lower=-(offset_window/2.0),upper=(offset_window/2.0),testval=x0)
             y0_model = eh.RADPERUAS*pm.Uniform('y0',lower=-(offset_window/2.0),upper=(offset_window/2.0),testval=y0)
         else:
-            x0_model = x0
-            y0_model = y0
+            x0_model = x0*eh.RADPERUAS
+            y0_model = y0*eh.RADPERUAS
 
         # Gaussian smoothing kernel parameters
         if (smooth is not None) & (fit_smooth == False):
@@ -1925,8 +1925,8 @@ def polimage2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=N
             x0_model = eh.RADPERUAS*pm.Uniform('x0',lower=-(offset_window/2.0),upper=(offset_window/2.0),testval=x0)
             y0_model = eh.RADPERUAS*pm.Uniform('y0',lower=-(offset_window/2.0),upper=(offset_window/2.0),testval=y0)
         else:
-            x0_model = x0
-            y0_model = y0
+            x0_model = x0*eh.RADPERUAS
+            y0_model = y0*eh.RADPERUAS
 
         # Gaussian smoothing kernel parameters
         if (smooth is not None) & (fit_smooth == False):
