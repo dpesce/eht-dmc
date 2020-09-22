@@ -188,11 +188,15 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
         if (dirichlet_weight != None):
             # Impose a Dirichlet prior on the pixel intensities,
             # with summation constraint equal to the total flux
-            if fit_dirichlet_weight == False:
+            if (fit_dirichlet_weight == False):
                 pix = pm.Dirichlet('pix',dirichlet_weights)
                 I = pm.Deterministic('I',pix*F)
+            elif (fit_dirichlet_weight == 'full'):
+                a = pm.Uniform('a',lower=0.0,upper=5.0,shape=npix)
+                pix = pm.Dirichlet('pix',a=a,shape=npix)
+                I = pm.Deterministic('I',pix*F)
             else:
-                a = pm.Uniform('a',lower=0.0,upper=2.0,shape=1)
+                a = pm.Uniform('a',lower=0.0,upper=5.0,shape=1)
                 pix = pm.Dirichlet('pix',a=a*np.ones_like(x),shape=npix)
                 I = pm.Deterministic('I',pix*F)
         else:
@@ -646,11 +650,15 @@ def image2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=None
         if (dirichlet_weight != None):
             # Impose a Dirichlet prior on the pixel intensities,
             # with summation constraint equal to the total flux
-            if fit_dirichlet_weight == False:
+            if (fit_dirichlet_weight == False):
                 pix = pm.Dirichlet('pix',dirichlet_weights)
                 I = pm.Deterministic('I',pix*F)
+            elif (fit_dirichlet_weight == 'full'):
+                a = pm.Uniform('a',lower=0.0,upper=5.0,shape=npix)
+                pix = pm.Dirichlet('pix',a=a,shape=npix)
+                I = pm.Deterministic('I',pix*F)
             else:
-                a = pm.Uniform('a',lower=0.0,upper=2.0,shape=1)
+                a = pm.Uniform('a',lower=0.0,upper=5.0,shape=1)
                 pix = pm.Dirichlet('pix',a=a*np.ones_like(x),shape=npix)
                 I = pm.Deterministic('I',pix*F)
         else:
@@ -1155,11 +1163,15 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
         if (dirichlet_weight != None):
             # Impose a Dirichlet prior on the pixel intensities,
             # with summation constraint equal to the total flux
-            if fit_dirichlet_weight == False:
+            if (fit_dirichlet_weight == False):
                 pix = pm.Dirichlet('pix',dirichlet_weights)
                 I = pm.Deterministic('I',pix*F)
+            elif (fit_dirichlet_weight == 'full'):
+                a = pm.Uniform('a',lower=0.0,upper=5.0,shape=npix)
+                pix = pm.Dirichlet('pix',a=a,shape=npix)
+                I = pm.Deterministic('I',pix*F)
             else:
-                a = pm.Uniform('a',lower=0.0,upper=2.0,shape=1)
+                a = pm.Uniform('a',lower=0.0,upper=5.0,shape=1)
                 pix = pm.Dirichlet('pix',a=a*np.ones_like(x),shape=npix)
                 I = pm.Deterministic('I',pix*F)
         else:
@@ -1898,11 +1910,15 @@ def polimage2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=N
         if (dirichlet_weight != None):
             # Impose a Dirichlet prior on the pixel intensities,
             # with summation constraint equal to the total flux
-            if fit_dirichlet_weight == False:
+            if (fit_dirichlet_weight == False):
                 pix = pm.Dirichlet('pix',dirichlet_weights)
                 I = pm.Deterministic('I',pix*F)
+            elif (fit_dirichlet_weight == 'full'):
+                a = pm.Uniform('a',lower=0.0,upper=5.0,shape=npix)
+                pix = pm.Dirichlet('pix',a=a,shape=npix)
+                I = pm.Deterministic('I',pix*F)
             else:
-                a = pm.Uniform('a',lower=0.0,upper=2.0,shape=1)
+                a = pm.Uniform('a',lower=0.0,upper=5.0,shape=1)
                 pix = pm.Dirichlet('pix',a=a*np.ones_like(x),shape=npix)
                 I = pm.Deterministic('I',pix*F)
         else:
