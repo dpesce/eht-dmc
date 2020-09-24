@@ -31,7 +31,8 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
           fit_total_flux=False,allow_offset=False,offset_window=200.0,n_start=25,n_burn=500,
           n_tune=5000,ntuning=2000,ntrials=10000,fit_smooth=False,smooth=None,fit_gains=True,
           fit_syserr=True,syserr=None,tuning_windows=None,output_tuning=False,
-          gain_amp_prior='normal',dirichlet_weight=1.0,fit_dirichlet_weight=False,**kwargs):
+          gain_amp_prior='normal',dirichlet_weight=1.0,fit_dirichlet_weight=False,
+          total_flux_prior=['uniform',0.0,1.0],**kwargs):
     """ Fit a Stokes I image to a VLBI observation
 
        Args:
@@ -178,9 +179,12 @@ def image(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,loos
         
         # total flux prior
         if fit_total_flux:
-            # set to be normal around the correct value, but bounded positive
-            BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
-            F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate,testval=total_flux_estimate)
+            if 'uniform' in total_flux_prior:
+                F = pm.Uniform('F',lower=total_flux_prior[1],upper=total_flux_prior[2],testval=total_flux_estimate)
+            else:
+                # set to be normal around the correct value, but bounded positive
+                BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
+                F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate,testval=total_flux_estimate)
         else:
             # fix at input value
             F = total_flux_estimate
@@ -485,7 +489,8 @@ def image2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=None
           fit_total_flux=False,allow_offset=False,offset_window=200.0,n_start=25,n_burn=500,
           n_tune=5000,ntuning=2000,ntrials=10000,fit_smooth=False,smooth=None,fit_gains=True,
           fit_syserr=True,syserr=None,tuning_windows=None,output_tuning=False,
-          gain_amp_prior='normal',dirichlet_weight=1.0,fit_dirichlet_weight=False,**kwargs):
+          gain_amp_prior='normal',dirichlet_weight=1.0,fit_dirichlet_weight=False,
+          total_flux_prior=['uniform',0.0,1.0],**kwargs):
     """ Fit a Stokes I image to a VLBI observation
 
        Args:
@@ -640,9 +645,12 @@ def image2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=None
         
         # total flux prior
         if fit_total_flux:
-            # set to be normal around the correct value, but bounded positive
-            BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
-            F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate,testval=total_flux_estimate)
+            if 'uniform' in total_flux_prior:
+                F = pm.Uniform('F',lower=total_flux_prior[1],upper=total_flux_prior[2],testval=total_flux_estimate)
+            else:
+                # set to be normal around the correct value, but bounded positive
+                BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
+                F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate,testval=total_flux_estimate)
         else:
             # fix at input value
             F = total_flux_estimate
@@ -947,7 +955,7 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
           smooth=None,n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,
           gain_amp_prior='normal',const_ref_RL=True,fit_gains=True,fit_leakages=True,
           fit_smooth=False,fit_syserr=True,syserr=None,tuning_windows=None,output_tuning=False,
-          dirichlet_weight=1.0,fit_dirichlet_weight=False,**kwargs):
+          dirichlet_weight=1.0,fit_dirichlet_weight=False,total_flux_prior=['uniform',0.0,1.0],**kwargs):
     """ Fit a polarimetric image to a VLBI observation
 
        Args:
@@ -1153,9 +1161,12 @@ def polimage(obs,nx,ny,xmin,xmax,ymin,ymax,start=None,total_flux_estimate=None,R
         
         # total flux prior
         if fit_total_flux:
-            # set to be normal around the correct value, but bounded positive
-            BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
-            F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate,testval=total_flux_estimate)
+            if 'uniform' in total_flux_prior:
+                F = pm.Uniform('F',lower=total_flux_prior[1],upper=total_flux_prior[2],testval=total_flux_estimate)
+            else:
+                # set to be normal around the correct value, but bounded positive
+                BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
+                F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate,testval=total_flux_estimate)
         else:
             # fix at input value
             F = total_flux_estimate
@@ -1686,7 +1697,7 @@ def polimage2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=N
           smooth=None,n_start=25,n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,
           gain_amp_prior='normal',const_ref_RL=True,fit_gains=True,fit_leakages=True,
           fit_smooth=False,fit_syserr=True,syserr=None,tuning_windows=None,output_tuning=False,
-          dirichlet_weight=1.0,fit_dirichlet_weight=False,**kwargs):
+          dirichlet_weight=1.0,fit_dirichlet_weight=False,total_flux_prior=['uniform',0.0,1.0],**kwargs):
     """ Fit a polarimetric image to a VLBI observation
 
        Args:
@@ -1900,9 +1911,12 @@ def polimage2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=N
         
         # total flux prior
         if fit_total_flux:
-            # set to be normal around the correct value, but bounded positive
-            BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
-            F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate,testval=total_flux_estimate)
+            if 'uniform' in total_flux_prior:
+                F = pm.Uniform('F',lower=total_flux_prior[1],upper=total_flux_prior[2],testval=total_flux_estimate)
+            else:
+                # set to be normal around the correct value, but bounded positive
+                BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
+                F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate,testval=total_flux_estimate)
         else:
             # fix at input value
             F = total_flux_estimate
