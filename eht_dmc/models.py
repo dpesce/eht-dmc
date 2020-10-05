@@ -713,7 +713,7 @@ def image2(obs,nx,ny,FOVx,FOVy,x0=0.0,y0=0.0,start=None,total_flux_estimate=None
             if gain_amp_prior == 'normal':
                 # set the gain amplitude priors to be normal around the specified inputs
                 BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
-                g = BoundedNormal('gain_amps',mu=np.exp(loggainamp_mean),sd=loggainamp_std,shape=N_gains)
+                g = BoundedNormal('gain_amps',mu=gainamp_mean,sd=gainamp_std,shape=N_gains)
                 logg = pm.Deterministic('logg',pm.math.log(g))
             
             # set the gain phase priors to be periodic uniform on (-pi,pi)
