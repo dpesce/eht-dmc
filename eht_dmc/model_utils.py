@@ -12,34 +12,21 @@ import pickle
 from tqdm import tqdm
 
 #######################################################
-# constants
-#######################################################
-
-SEFD_error_budget = {'AA':0.10,
-                     'AP':0.11,
-                     'AZ':0.07,
-                     'LM':0.22,
-                     'PV':0.10,
-                     'SM':0.15,
-                     'JC':0.14,
-                     'SP':0.07}
-
-#######################################################
 # functions
 #######################################################
 
-def gain_logamp_prior(obs,SEFD_error_budget=SEFD_error_budget):
+def gain_amp_prior(obs,gain_amp_priors=(1.0,0.1)):
     """ Construct vector of prior means and standard deviations
-        for log gain amplitudes
+        for gain amplitudes
 
        Args:
            obs (obsdata): eht-imaging obsdata object containing VLBI data
-           SEFD_error_budget (dict): dictionary of a priori error budget
-                                     for station SEFDs (fractional)
+           gain_amp_priors (tuple or dict): if tuple, (mean,sigma) for all stations
+                                               if dict, a dictionary of (mean,sigma) for each station
            
        Returns:
-           loggainamp_mean: prior means for log gain amplitudes
-           loggainamp_std: prior standard deviations for log gain amplitudes
+           gainamp_mean: prior means for log gain amplitudes
+           gainamp_std: prior standard deviations for gain amplitudes
 
     """
 
@@ -69,25 +56,28 @@ def gain_logamp_prior(obs,SEFD_error_budget=SEFD_error_budget):
     gainamp_mean = np.ones(N_gains)
     gainamp_std = np.ones(N_gains)
 
-    # loop over stations
-    for key in SEFD_error_budget.keys():
-        index = (A_gains == key)
-        gainamp_mean[index] = 1.0
-        gainamp_std[index] = SEFD_error_budget[key]
+    # apply the specified priors
+    if (type(gain_amp_priors) != dict):
+        gainamp_mean *= gain_amp_priors[0]
+        gainamp_std *= gain_amp_priors[1]
+    else:
+        # loop over stations
+        for key in gain_amp_priors.keys():
+            index = (A_gains == key)
+            gainamp_mean[index] = gain_amp_priors[key][0]
+            gainamp_std[index] = gain_amp_priors[key][1]
 
-    # take log
-    loggainamp_mean = np.log(gainamp_mean)
-    loggainamp_std = gainamp_std/gainamp_mean
+    return gainamp_mean, gainamp_std
 
-    return loggainamp_mean, loggainamp_std
-
-def gain_phase_prior(obs,ref_station='AA'):
+def gain_phase_prior(obs,gain_phase_priors=(0.0,0.0001)):
     """ Construct vector of prior means and inverse standard deviations
         for gain phases
 
        Args:
            obs (obsdata): eht-imaging obsdata object containing VLBI data
            ref_station (str): name of reference station
+           gain_phase_priors (tuple or dict): if tuple, (mean,kappa) for all stations
+                                               if dict, a dictionary of (mean,kappa) for each station
            
        Returns:
            gainphase_mu: prior means for gain phases
@@ -118,21 +108,61 @@ def gain_phase_prior(obs,ref_station='AA'):
     A_gains = np.array(A_gains)
 
     # initialize vectors of gain phase means and inverse standard deviations
-    gainphase_mu = np.zeros(N_gains)
-    gainphase_kappa = 0.0001*np.ones(N_gains)
+    gainphase_mu = np.ones(N_gains)
+    gainphase_kappa = np.ones(N_gains)
 
-    # set reference station standard devation to be tiny
-    if ref_station is not None:
-        for it, t in enumerate(timestamps):
-            index = (T_gains == t)
-            ants_here = A_gains[index]
-            for ant in ants_here:
-                if ant == ref_station:
-                    ind = ((T_gains == t) & (A_gains == ant))
-                    gainphase_kappa[ind] = 10000.0
-                    break
+    # apply the specified priors
+    if (type(gain_phase_priors) != dict):
+        gainphase_mu *= gain_phase_priors[0]
+        gainphase_kappa *= gain_phase_priors[1]
+    else:
+        # loop over stations
+        for key in gain_phase_priors.keys():
+            index = (A_gains == key)
+            gainphase_mu[index] = gain_phase_priors[key][0]
+            gainphase_kappa[index] = gain_phase_priors[key][1]
 
     return gainphase_mu, gainphase_kappa
+
+def dterm_amp_prior(obs,dterm_amp_priors=(0.0,1.0)):
+    """ Construct vector of prior low and high boundaries
+        for D-term amplitudes
+
+       Args:
+           obs (obsdata): eht-imaging obsdata object containing VLBI data
+           dterm_amp_priors (tuple or dict): if tuple, (lo,hi) for all stations
+                                               if dict, a dictionary of (lo,hi) for each station
+           
+       Returns:
+           dtermamp_lo: prior lower bound for D-term amplitudes
+           dtermamp_hi: prior upper bound for D-term amplitudes
+
+    """
+
+    # get array of station names
+    ant1 = obs.data['t1']
+    ant2 = obs.data['t2']
+    stations = np.unique(np.concatenate((ant1,ant2)))
+
+    # determine the total number of D-terms that need to be solved for
+    N_Dterms = len(stations)
+
+    # initialize vectors of gain prior means and standard deviations
+    dtermamp_lo = np.ones(N_Dterms)
+    dtermamp_hi = np.ones(N_Dterms)
+
+    # apply the specified priors
+    if (type(dterm_amp_priors) != dict):
+        dtermamp_lo *= dterm_amp_priors[0]
+        dtermamp_hi *= dterm_amp_priors[1]
+    else:
+        # loop over stations
+        for key in dterm_amp_priors.keys():
+            index = (stations == key)
+            dtermamp_lo[index] = dterm_amp_priors[key][0]
+            dtermamp_hi[index] = dterm_amp_priors[key][1]
+
+    return dtermamp_lo, dtermamp_hi
 
 def get_step_for_trace(trace=None, model=None, diag=False, regularize=True, regular_window=5, regular_variance=1e-3, **kwargs):
     """ Define a tuning procedure that adapts off-diagonal mass matrix terms
