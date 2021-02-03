@@ -2365,17 +2365,17 @@ def image_noisy(obs,nx,ny,FOVx,FOVy,LC=None,x0=0.0,y0=0.0,start=None,total_flux_
 
         # systematic noise prescription
         # set the prior on the multiplicative systematic error term to be uniform on [0,1]
-        multiplicative = pm.Uniform('multiplicative',lower=0.0,upper=1.0,testval=0.01)
+        multiplicative = pm.Uniform('multiplicative',lower=0.0,upper=0.05,testval=0.01)
 
         # set the prior on the additive systematic error term to be uniform on [0,1] Jy
-        additive = pm.Uniform('additive',lower=0.0,upper=1.0,testval=0.001)
+        additive = pm.Uniform('additive',lower=0.0,upper=0.05,testval=0.001)
         
         # set the power law error term priors
         logn0 = pm.Uniform('logn0',lower=-10.0,upper=0.0)
         n0 = pm.Deterministic('n0',pm.math.exp(logn0))
-        umax = pm.Uniform('umax',lower=0.0,upper=1.0e10)
-        b = pm.Uniform('b',lower=0.0,upper=10.0)
-        c = pm.Uniform('c',lower=0.0,upper=10.0)
+        umax = pm.Uniform('umax',lower=1.0e10,upper=5.0e10)
+        b = pm.Uniform('b',lower=0.0,upper=5.0)
+        c = pm.Uniform('c',lower=0.0,upper=3.0)
         
         # permit a centroid shift in the image
         if allow_offset:
