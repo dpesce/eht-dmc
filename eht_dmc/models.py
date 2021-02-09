@@ -2371,11 +2371,19 @@ def image_noisy(obs,nx,ny,FOVx,FOVy,LC=None,x0=0.0,y0=0.0,start=None,total_flux_
         additive = pm.Uniform('additive',lower=0.0,upper=0.05,testval=0.001)
         
         # set the power law error term priors
-        logn0 = pm.Uniform('logn0',lower=-10.0,upper=0.0)
+        logn0 = pm.Uniform('logn0',lower=-10.0,upper=-2.0)
         n0 = pm.Deterministic('n0',pm.math.exp(logn0))
-        umax = pm.Uniform('umax',lower=1.0e10,upper=5.0e10)
+        umax = pm.Uniform('umax',lower=1.0e9,upper=5.0e9)
         b = pm.Uniform('b',lower=0.0,upper=5.0)
         c = pm.Uniform('c',lower=0.0,upper=3.0)
+
+        # multiplicative = pm.Uniform('multiplicative',lower=0.0,upper=0.001)
+        # additive = pm.Uniform('additive',lower=0.0,upper=0.001)
+        # logn0 = pm.Uniform('logn0',lower=-3.5,upper=-3.4)
+        # n0 = pm.Deterministic('n0',pm.math.exp(logn0))
+        # umax = pm.Uniform('umax',lower=3.65e9,upper=3.7e9)
+        # b = pm.Uniform('b',lower=2.65,upper=2.7)
+        # c = pm.Uniform('c',lower=1.2,upper=1.25)
         
         # permit a centroid shift in the image
         if allow_offset:
@@ -2516,6 +2524,10 @@ def image_noisy(obs,nx,ny,FOVx,FOVy,LC=None,x0=0.0,y0=0.0,start=None,total_flux_
 
         # burn-in and initial mass matrix tuning
         for istep, steps in enumerate(windows):
+            # if istep == 0:
+            #     step = mu.get_step_for_trace(None,regularize=regularize,diag=diag,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth)
+            # else:
+            #     step = mu.get_step_for_trace(burnin_trace,regularize=regularize,diag=diag,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth)
             step = mu.get_step_for_trace(burnin_trace,regularize=regularize,diag=diag,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth)
             burnin_trace = pm.sample(draws=steps, start=starting_values, tune=n_burn, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
             starting_values = [t[-1] for t in burnin_trace._straces.values()]
@@ -2631,6 +2643,412 @@ def image_noisy(obs,nx,ny,FOVx,FOVy,LC=None,x0=0.0,y0=0.0,start=None,total_flux_
                  'diag': diag,
                  'dirichlet_weight': dirichlet_weight,
                  'fit_dirichlet_weight': fit_dirichlet_weight
+                 }
+
+    return modelinfo
+
+def crescent_noisy(obs,LC=None,x0=0.0,y0=0.0,start=None,total_flux_estimate=None,
+          fit_total_flux=False,allow_offset=False,offset_window=200.0,n_start=25,
+          n_burn=500,n_tune=5000,ntuning=2000,ntrials=10000,fit_smooth=False,
+          smooth=None,fit_gains=True,tuning_windows=None,output_tuning=False,
+          gain_amp_prior='normal',total_flux_prior=['uniform',0.0,1.0],**kwargs):
+    """ Fit a Stokes I crescent model to a VLBI observation
+        
+       Args:
+           obs (obsdata): eht-imaging obsdata object containing VLBI data
+           x0 (float): crescent center location along x-axis (uas)
+           y0 (float): crescent center location along y-axis (uas)
+           LC (array): light curve
+           
+           start (modelinfo): the DMC model info for a previous run from which to continue sampling
+           total_flux_estimate (float): estimate of total Stokes I crescent flux (Jy)
+           offset_window (float): width of square offset window (uas)
+               
+           fit_total_flux (bool): flag to fit for the total flux
+           fit_gains (bool): flag to fit for the complex gains
+           fit_smooth (bool): flag to fit for the smoothing kernel
+           allow_offset (bool): flag to permit crescent centroid to be a free parameter
+           output_tuning (bool): flag to output intermediate tuning chains
+            
+           n_start (int): initial number of default tuning steps
+           n_burn (int): number of burn-in steps
+           n_tune (int): number of mass matrix tuning steps
+
+           ntuning (int): number of tuning steps to take during last leg
+           ntrials (int): number of posterior samples to take
+           tuning_windows (list): sequence of tuning window lengths
+                      
+       Returns:
+           modelinfo: a dictionary object containing the model fit information
+
+    """
+
+    if gain_amp_prior not in ['log','normal']:
+        raise Exception('gain_amp_prior keyword argument must be log or normal.')
+
+    # some kwarg default values
+    ehtim_convention = kwargs.get('ehtim_convention', True)
+    ref_station = kwargs.get('ref_station','AA')
+    regularize = kwargs.get('regularize',True)
+    gain_amp_priors = kwargs.get('gain_amp_priors',(1.0,0.1))
+    gain_phase_priors = kwargs.get('gain_phase_priors',(0.0,0.0001))
+    max_treedepth = kwargs.get('max_treedepth',MAX_TREEDEPTH)
+    early_max_treedepth = kwargs.get('early_max_treedepth',EARLY_MAX_TREEDEPTH)
+    output_tuning_dir = kwargs.get('output_tuning_dir','./tuning')
+    diag = kwargs.get('diag',False)
+
+    ###################################################
+    # data bookkeeping
+
+    # first, make sure we're using a Stokes representation
+    if obs.polrep is not 'stokes':
+        obs = obs.switch_polrep('stokes')
+
+    # (u,v) coordinate info
+    u = obs.data['u']
+    v = obs.data['v']
+    rho = np.sqrt((u**2.0) + (v**2.0))
+
+    # get array of stations
+    ant1 = obs.data['t1']
+    ant2 = obs.data['t2']
+    stations = np.unique(np.concatenate((ant1,ant2)))
+
+    # read in the real and imaginary visibilities
+    I_real = np.real(obs.data['vis'])
+    I_imag = np.imag(obs.data['vis'])
+    I_real_err = obs.data['sigma']
+    I_imag_err = obs.data['sigma']
+
+    # construct mask to remove missing data
+    mask = np.where(np.isfinite(obs.data['vis']))
+
+    # construct design matrices for gain terms
+    T_gains, A_gains = du.gain_account(obs)
+    gain_design_mat_1, gain_design_mat_2 = du.gain_design_mats(obs)
+
+    # if there's no input total flux estimate, estimate it here
+    if total_flux_estimate is None:
+        total_flux_estimate = du.estimate_total_flux(obs)
+
+    ###################################################
+    # organizing prior information
+
+    # prior info for log gain amplitudes
+    gainamp_mean, gainamp_std = mu.gain_amp_prior(obs,gain_amp_priors=gain_amp_priors)
+    loggainamp_mean = np.log(gainamp_mean)
+    loggainamp_std = gainamp_std/gainamp_mean
+    
+    # prior info for gain phases
+    gainphase_mu, gainphase_kappa = mu.gain_phase_prior(obs,gain_phase_priors=gain_phase_priors)
+    
+    if ref_station is not None:
+        ind_ref = (A_gains == ref_station)
+        gainphase_kappa[ind_ref] = 10000.0
+
+    ###################################################
+    # setting up the model
+
+    # number of gains
+    N_gains = len(loggainamp_mean)
+
+    model = pm.Model()
+
+    with model:
+
+        ###############################################
+        # set the priors for the crescent parameters
+        
+        # total flux prior
+        if fit_total_flux:
+            if 'uniform' in total_flux_prior:
+                F = pm.Uniform('F',lower=total_flux_prior[1],upper=total_flux_prior[2],testval=total_flux_estimate)
+            else:
+                # set to be normal around the correct value, but bounded positive
+                BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
+                F = BoundedNormal('F',mu=total_flux_estimate,sd=0.1*total_flux_estimate,testval=total_flux_estimate)
+        else:
+            # fix at input value
+            F = total_flux_estimate
+
+        # outer crescent radius
+        Rout = eh.RADPERUAS*pm.Uniform('Rout',lower=0.0,upper=100.0)
+
+        # dimensionless width
+        psi = pm.Uniform('psi',lower=0.0,upper=1.0)
+        Rin = pm.Deterministic('Rin',Rout*(1.0-psi))
+
+        # dimensionless shift
+        tau = pm.Uniform('tau',lower=0.0,upper=1.0)
+
+        # orientation
+        phi = pm.VonMises('phi',mu=0.0,kappa=0.0001)
+
+        # systematic noise prescription
+        # set the prior on the multiplicative systematic error term to be uniform on [0,1]
+        multiplicative = pm.Uniform('multiplicative',lower=0.0,upper=0.05,testval=0.01)
+
+        # set the prior on the additive systematic error term to be uniform on [0,1] Jy
+        additive = pm.Uniform('additive',lower=0.0,upper=0.05,testval=0.001)
+        
+        # set the power law error term priors
+        logn0 = pm.Uniform('logn0',lower=-10.0,upper=-2.0)
+        n0 = pm.Deterministic('n0',pm.math.exp(logn0))
+        umax = pm.Uniform('umax',lower=1.0e9,upper=5.0e9)
+        b = pm.Uniform('b',lower=0.0,upper=5.0)
+        c = pm.Uniform('c',lower=0.0,upper=3.0)
+        
+        # permit a centroid shift in the image
+        if allow_offset:
+            x0_model = eh.RADPERUAS*pm.Uniform('x0',lower=-(offset_window/2.0),upper=(offset_window/2.0),testval=x0)
+            y0_model = eh.RADPERUAS*pm.Uniform('y0',lower=-(offset_window/2.0),upper=(offset_window/2.0),testval=y0)
+        else:
+            x0_model = x0*eh.RADPERUAS
+            y0_model = y0*eh.RADPERUAS
+
+        # Gaussian smoothing kernel parameters
+        if (smooth is not None) & (fit_smooth == False):
+            # smoothing width
+            sigma = eh.RADPERUAS*(smooth/(2.0*np.sqrt(2.0*np.log(2.0))))
+        elif (fit_smooth == True):
+            # smoothing width
+            sigma = eh.RADPERUAS*pm.Uniform('sigma',lower=0.0,upper=100.0)
+
+        ###############################################
+        # set the priors for the gain parameters
+
+        if fit_gains:
+
+            if gain_amp_prior == 'log':
+                # set the gain amplitude priors to be log-normal around the specified inputs
+                logg = pm.Normal('logg',mu=loggainamp_mean,sd=loggainamp_std,shape=N_gains)
+                g = pm.Deterministic('gain_amps',pm.math.exp(logg))
+            if gain_amp_prior == 'normal':
+                # set the gain amplitude priors to be normal around the specified inputs
+                BoundedNormal = pm.Bound(pm.Normal, lower=0.0)
+                g = BoundedNormal('gain_amps',mu=gainamp_mean,sd=gainamp_std,shape=N_gains)
+                logg = pm.Deterministic('logg',pm.math.log(g))
+            
+            # set the gain phase priors to be periodic uniform on (-pi,pi)
+            theta = pm.VonMises('gain_phases',mu=gainphase_mu,kappa=gainphase_kappa,shape=N_gains)
+
+        ###############################################
+        # determine the base visibilities
+
+        inner_shift_real = -pm.math.sin(2.0*np.pi*psi*Rout*tau*((u*pm.math.cos(phi)) + (v*pm.math.sin(phi))))
+        inner_shift_imag = pm.math.cos(2.0*np.pi*psi*Rout*tau*((u*pm.math.cos(phi)) + (v*pm.math.sin(phi))))
+        
+        flux_factor = F / (np.pi*((Rout**2.0) - (Rin**2.0)))
+        
+        Ireal_pregain_preshift_presmooth = flux_factor*(((Rout/rho)*mu.J1(2.0*np.pi*Rout*rho)) - (inner_shift_real*((Rin/rho)*mu.J1(2.0*np.pi*Rin*rho))))
+        Iimag_pregain_preshift_presmooth = flux_factor*(((Rout/rho)*mu.J1(2.0*np.pi*Rout*rho)) - (inner_shift_imag*((Rin/rho)*mu.J1(2.0*np.pi*Rin*rho))))
+
+        ###############################################
+        # smooth with the Gaussian kernel
+        
+        if (smooth is not None) | (fit_smooth == True):
+            Ireal_pregain_preshift = Ireal_pregain_preshift_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
+            Iimag_pregain_preshift = Iimag_pregain_preshift_presmooth*pm.math.exp(-2.0*(np.pi**2.0)*(sigma**2.0)*(rho**2.0))
+        else:
+            Ireal_pregain_preshift = Ireal_pregain_preshift_presmooth
+            Iimag_pregain_preshift = Iimag_pregain_preshift_presmooth
+
+        ###############################################
+        # shift centroid
+
+        shift_term = 2.0*np.pi*((u*x0_model) + (v*y0_model))
+        Ireal_pregain_preLC = (Ireal_pregain_preshift*pm.math.cos(shift_term)) + (Iimag_pregain_preshift*pm.math.sin(shift_term))
+        Iimag_pregain_preLC = (Iimag_pregain_preshift*pm.math.cos(shift_term)) - (Ireal_pregain_preshift*pm.math.sin(shift_term))
+
+        ###############################################
+        # multiply by light curve
+
+        if (LC is not None):
+            Ireal_pregain = Ireal_pregain_preLC*LC
+            Iimag_pregain = Iimag_pregain_preLC*LC
+        else:
+            Ireal_pregain = Ireal_pregain_preLC*1.0
+            Iimag_pregain = Iimag_pregain_preLC*1.0
+
+        ###############################################
+        # compute the corruption terms
+
+        if fit_gains:
+
+            gainamp_1 = pm.math.exp(pm.math.dot(gain_design_mat_1,logg))
+            gainamp_2 = pm.math.exp(pm.math.dot(gain_design_mat_2,logg))
+
+            gainphase_1 = pm.math.dot(gain_design_mat_1,theta)
+            gainphase_2 = pm.math.dot(gain_design_mat_2,theta)
+
+        else:
+            gainamp_1 = 1.0
+            gainamp_2 = 1.0
+
+            gainphase_1 = 0.0
+            gainphase_2 = 0.0
+
+        ###############################################
+        # apply corruptions to the model visibilities
+
+        Ireal_model = gainamp_1*gainamp_2*((pm.math.cos(gainphase_1 - gainphase_2)*Ireal_pregain) - (pm.math.sin(gainphase_1 - gainphase_2)*Iimag_pregain))
+        Iimag_model = gainamp_1*gainamp_2*((pm.math.cos(gainphase_1 - gainphase_2)*Iimag_pregain) + (pm.math.sin(gainphase_1 - gainphase_2)*Ireal_pregain))
+
+        ###############################################
+        # add in the systematic noise component
+
+        Itot_model = pm.math.sqrt((Ireal_model**2.0) + (Iimag_model**2.0))
+        err2 = ((multiplicative*Itot_model)**2.0) + (additive**2.0) + ((n0**2.0)*((rho/umax)**c) / (1.0 + ((rho/umax)**(b+c))))
+
+        Ireal_err_model = pm.math.sqrt((I_real_err**2.0) + err2)
+        Iimag_err_model = pm.math.sqrt((I_imag_err**2.0) + err2)
+
+        ###############################################
+        # define the likelihood
+
+        L_real = pm.Normal('L_real',mu=Ireal_model[mask],sd=Ireal_err_model[mask],observed=I_real[mask])
+        L_imag = pm.Normal('L_imag',mu=Iimag_model[mask],sd=Iimag_err_model[mask],observed=I_imag[mask])
+
+        ###############################################
+        # keep track of summed-squared residuals (ssr)
+
+        ssr = pm.Deterministic('ssr',pm.math.sum((((Ireal_model[mask]-I_real[mask])/Ireal_err_model[mask])**2.0) + (((Iimag_model[mask]-I_imag[mask])/Iimag_err_model[mask])**2.0)))
+
+    ###################################################
+    # fit the model
+
+    # set up tuning windows
+    if tuning_windows is not None:
+        windows = np.array(tuning_windows)
+    else:
+        windows = n_start * (2**np.arange(np.floor(np.log2((n_tune - n_burn) / n_start))))
+
+    # make directory for saving intermediate output
+    if output_tuning:
+        if not os.path.exists(output_tuning_dir):
+            os.mkdir(output_tuning_dir)
+
+    # keep track of the tuning runs
+    tuning_trace_list = list()
+    with model:
+        
+        # initialize using previous run if supplied
+        if start is not None:
+            burnin_trace = start['trace']
+            starting_values = [t[-1] for t in burnin_trace._straces.values()]
+        else:
+            burnin_trace = None
+            starting_values = None
+
+        # burn-in and initial mass matrix tuning
+        for istep, steps in enumerate(windows):
+            # if istep == 0:
+            #     step = mu.get_step_for_trace(None,regularize=regularize,diag=diag,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth)
+            # else:
+            #     step = mu.get_step_for_trace(burnin_trace,regularize=regularize,diag=diag,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth)
+            step = mu.get_step_for_trace(burnin_trace,regularize=regularize,diag=diag,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth)
+            burnin_trace = pm.sample(draws=steps, start=starting_values, tune=n_burn, chains=1, step=step,compute_convergence_checks=False, discard_tuned_samples=False)
+            starting_values = [t[-1] for t in burnin_trace._straces.values()]
+            tuning_trace_list.append(burnin_trace)
+
+            # save intermediate output
+            if output_tuning:
+                
+                modelinfo = {'modeltype': 'crescent',
+                 'model': model,
+                 'trace': burnin_trace,
+                 'tuning_traces': tuning_trace_list,
+                 'x0': x0,
+                 'y0': y0,
+                 'fit_total_flux': fit_total_flux,
+                 'allow_offset': allow_offset,
+                 'offset_window': offset_window,
+                 'smooth': smooth,
+                 'total_flux_estimate': total_flux_estimate,
+                 'fit_gains': fit_gains,
+                 'ntuning': ntuning,
+                 'ntrials': ntrials,
+                 'obs': obs,
+                 'stations': stations,
+                 'T_gains': T_gains,
+                 'A_gains': A_gains,
+                 'gain_amp_prior': gain_amp_prior,
+                 'fit_gains': fit_gains,
+                 'fit_smooth': fit_smooth,
+                 'tuning_windows': tuning_windows,
+                 'output_tuning': output_tuning,
+                 'diag': diag
+                 }
+
+                # make directory for this step
+                dirname = output_tuning_dir+'/step'+str(istep).zfill(5)
+                if not os.path.exists(dirname):
+                    os.mkdir(dirname)
+
+                # save modelinfo
+                mu.save_model(modelinfo,dirname+'/modelinfo.p')
+
+                # save trace plots
+                pl.plot_trace(modelinfo)
+                plt.savefig(dirname+'/traceplots.png',dpi=300)
+                plt.close()
+
+                # HMC energy plot
+                energyplot = pl.plot_energy(modelinfo)
+                plt.savefig(dirname+'/energyplot.png',dpi=300,bbox_inches='tight')
+                plt.close()
+
+                # plot HMC step size for main sampling run
+                stepplot = pl.plot_stepsize(modelinfo)
+                plt.savefig(dirname+'/stepsize.png',dpi=300,bbox_inches='tight')
+                plt.close()
+
+                # plot HMC step size for full run
+                stepplot = plt.figure(figsize=(6,6))
+                ax = stepplot.add_axes([0.15,0.1,0.8,0.8])
+                steparr = list()
+                for ttrace in tuning_trace_list:
+                    stepsize = ttrace.get_sampler_stats('step_size')
+                    steparr.append(stepsize)
+                steparr = np.concatenate(steparr)
+                ax.plot(steparr,'b-')
+                ax.semilogy()
+                ax.set_ylabel('Step size')
+                ax.set_xlabel('Trial number')
+                plt.savefig(dirname+'/stepsize_full.png',dpi=300,bbox_inches='tight')
+                plt.close()
+
+        # posterior sampling
+        step = mu.get_step_for_trace(burnin_trace,regularize=regularize,diag=diag,adapt_step_size=True,max_treedepth=max_treedepth,early_max_treedepth=early_max_treedepth)
+        trace = pm.sample(draws=ntrials, tune=ntuning, step=step, start=starting_values, chains=1, discard_tuned_samples=False)
+
+    ###################################################
+    # package the model info
+
+    modelinfo = {'modeltype': 'crescent',
+                 'model': model,
+                 'trace': trace,
+                 'tuning_traces': tuning_trace_list,
+                 'x0': x0,
+                 'y0': y0,
+                 'fit_total_flux': fit_total_flux,
+                 'allow_offset': allow_offset,
+                 'offset_window': offset_window,
+                 'smooth': smooth,
+                 'total_flux_estimate': total_flux_estimate,
+                 'fit_gains': fit_gains,
+                 'ntuning': ntuning,
+                 'ntrials': ntrials,
+                 'obs': obs,
+                 'stations': stations,
+                 'T_gains': T_gains,
+                 'A_gains': A_gains,
+                 'gain_amp_prior': gain_amp_prior,
+                 'fit_gains': fit_gains,
+                 'fit_smooth': fit_smooth,
+                 'tuning_windows': tuning_windows,
+                 'output_tuning': output_tuning,
+                 'diag': diag
                  }
 
     return modelinfo
