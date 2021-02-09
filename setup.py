@@ -24,5 +24,6 @@ if __name__ == "__main__":
                             "numpy",
                             "scipy",
                             "corner",
+                            "tqdm",
                             "ehtplot"]  # git+https://github.com/liamedeiros/ehtplot.git
     )

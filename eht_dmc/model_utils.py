@@ -10,10 +10,6 @@ import ehtim as eh
 import pymc3 as pm
 import pickle
 from tqdm import tqdm
-from scipy.special import jv
-import theano
-import theano.tensor as tt
-from theano.compile.ops import as_op
 
 #######################################################
 # functions
@@ -223,119 +219,6 @@ def get_step_for_trace(trace=None, model=None, diag=False, regularize=True, regu
     potential = pm.step_methods.hmc.quadpotential.QuadPotentialFull(cov)
 
     return pm.NUTS(potential=potential, **kwargs)
-
-#######################################################
-# custom pymc3 functions
-#######################################################
-
-zero = theano.shared(0.0)
-one = theano.shared(1.0)
-two = theano.shared(2.0)
-three = theano.shared(3.0)
-four = theano.shared(4.0)
-five = theano.shared(5.0)
-six = theano.shared(6.0)
-
-# Bessel functions
-@as_op(itypes=[tt.dscalar, tt.dvector],otypes=[tt.dvector])
-def tt_jv(nu,x):
-    return jv(nu,x)
-
-# Bessel J1
-class J1(tt.Op):
-    itypes = [tt.dvector]
-    otypes = [tt.dvector]
-
-    def perform(self, node, inputs, outputs):
-        theta, = inputs
-        J1 = jv(1,theta)
-        outputs[0][0] = np.array(J1)
-
-    def grad(self, inputs, g):
-        theta, = inputs
-        J0 = tt_jv(zero,theta)
-        J1 = self(theta)
-        return [g[0]*(J0 - (J1/theta))]
-
-# Bessel J2
-class J2(tt.Op):
-    itypes = [tt.dvector]
-    otypes = [tt.dvector]
-
-    def perform(self, node, inputs, outputs):
-        theta, = inputs
-        J2 = jv(2,theta)
-        outputs[0][0] = np.array(J2)
-
-    def grad(self, inputs, g):
-        theta, = inputs
-        J1 = tt_jv(one,theta)
-        J2 = self(theta)
-        return [g[0]*(J1 - (2.0*J2/theta))]
-
-# Bessel J3
-class J3(tt.Op):
-    itypes = [tt.dvector]
-    otypes = [tt.dvector]
-
-    def perform(self, node, inputs, outputs):
-        theta, = inputs
-        J3 = jv(3,theta)
-        outputs[0][0] = np.array(J3)
-
-    def grad(self, inputs, g):
-        theta, = inputs
-        J2 = tt_jv(two,theta)
-        J3 = self(theta)
-        return [g[0]*(J2 - (3.0*J3/theta))]
-
-# Bessel J4
-class J4(tt.Op):
-    itypes = [tt.dvector]
-    otypes = [tt.dvector]
-
-    def perform(self, node, inputs, outputs):
-        theta, = inputs
-        J4 = jv(4,theta)
-        outputs[0][0] = np.array(J4)
-
-    def grad(self, inputs, g):
-        theta, = inputs
-        J3 = tt_jv(three,theta)
-        J4 = self(theta)
-        return [g[0]*(J3 - (4.0*J4/theta))]
-
-# Bessel J5
-class J5(tt.Op):
-    itypes = [tt.dvector]
-    otypes = [tt.dvector]
-
-    def perform(self, node, inputs, outputs):
-        theta, = inputs
-        J5 = jv(5,theta)
-        outputs[0][0] = np.array(J5)
-
-    def grad(self, inputs, g):
-        theta, = inputs
-        J4 = tt_jv(four,theta)
-        J5 = self(theta)
-        return [g[0]*(J4 - (5.0*J5/theta))]
-
-# Bessel J6
-class J6(tt.Op):
-    itypes = [tt.dvector]
-    otypes = [tt.dvector]
-
-    def perform(self, node, inputs, outputs):
-        theta, = inputs
-        J6 = jv(6,theta)
-        outputs[0][0] = np.array(J6)
-
-    def grad(self, inputs, g):
-        theta, = inputs
-        J5 = tt_jv(five,theta)
-        J6 = self(theta)
-        return [g[0]*(J5 - (6.0*J6/theta))]
 
 #######################################################
 # io utilities
