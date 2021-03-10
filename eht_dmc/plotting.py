@@ -9,7 +9,6 @@ import numpy as np
 import ehtim as eh
 import pymc3 as pm
 import matplotlib.pyplot as plt
-import ehtplot
 import corner
 import os
 from tqdm import tqdm
@@ -213,7 +212,7 @@ def plot_image(modelinfo,imtype='I',moment='mean',nx=100,ny=100,fov_scale=1.5,bu
     if (imtype == 'I'):
         vmin = 0
         vmax = np.max(im)
-        implot = ax.pcolormesh(x_edges,y_edges,im,vmin=vmin,vmax=vmax,cmap='afmhot_us')
+        implot = ax.pcolormesh(x_edges,y_edges,im,vmin=vmin,vmax=vmax,cmap='afmhot')
     else:
         vmin = np.min([-np.abs(np.min(im)),-np.abs(np.max(im))])
         vmax = np.max([np.abs(np.min(im)),np.abs(np.max(im))])

@@ -6,7 +6,7 @@ def read(fname):
 
 if __name__ == "__main__":
     setup(name="eht-dmc",
-          version = "0.1dev",
+          version = "0.2",
           author = "Dom Pesce",
           author_email = "dpesce@cfa.harvard.edu",
           description = ("Python code to perform radio interferometric imaging and "+
@@ -17,13 +17,14 @@ if __name__ == "__main__":
           url = "https://github.com/dpesce/eht-dmc",
           packages = ["eht_dmc"],
           long_description=read('README.md'),
-          install_requires=["ehtim",  # https://github.com/achael/eht-imaging.git
+          install_requires=["ehtim==1.2.2",  # https://github.com/achael/eht-imaging.git
                             "pymc3",
+                            "arviz==0.10",
                             "future",
                             "matplotlib",
                             "numpy",
+                            "matplotlib",
                             "scipy",
                             "corner",
-                            "tqdm",
-                            "ehtplot"]  # git+https://github.com/liamedeiros/ehtplot.git
+                            "tqdm"]
     )
