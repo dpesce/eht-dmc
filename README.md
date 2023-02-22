@@ -1,7 +1,9 @@
-# eht-dmc
-A radio interferometric modeling tool developed for the Event Horizon Telescope (EHT).  The framework employed here utilizes PyMC3 for sampling and the eht-imaging library for VLBI data manipulation.
+> :warning: **IMPORTANT NOTE:** 
+> *`eht-dmc` is no longer supported software.  Interested users should instead see [`Comrade.jl`](https://github.com/ptiede/Comrade.jl).*
 
-NOTE: Currently still in testing mode, so no guarantees that code will work at all yet.
+# eht-dmc
+
+`eht-dmc` is a radio interferometric modeling tool developed for the Event Horizon Telescope (EHT).  The framework employed here utilizes PyMC3 for sampling and the eht-imaging library for VLBI data manipulation.
 
 ### Installation instructions
 To install the most recent version, clone the repository, move into the main directory, and install using `pip`:
